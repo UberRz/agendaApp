@@ -1,0 +1,69 @@
+### MAVEN ###
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### LOGS ###
+*.log
+*/logs/
+
+### SEGURIDAD Y VARIABLES DE ENTORNO (CRÍTICO) ###
+# Nunca subas credenciales, contraseñas ni archivos .env al repositorio
+.env
+.env.*
+*.env
+application-secret.properties
+application-dev.properties
+
+### DOCKER Y BASES DE DATOS (Postgres, MySQL, etc.) ###
+# Ignora las carpetas locales donde Docker guarda la persistencia de las BD
+docker-data/
+db-data/
+mysql_data/
+postgres_data/
+pgdata/
+pg_data/
+h2-data/
+
+### SISTEMAS OPERATIVOS ###
+# Archivos basura y ocultos de Windows y Mac
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+### IDEs y EDITORES ###
+# Zed (Tu editor)
+.zed/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Eclipse / STS
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
