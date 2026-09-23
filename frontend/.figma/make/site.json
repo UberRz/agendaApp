@@ -1,0 +1,10 @@
+{
+  "description": "A user-friendly platform for managing service bookings, allowing users and providers to create accounts, schedule appointments, and streamline reservations.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
