@@ -5,6 +5,8 @@ import com.agendaapp.service.IUsuarioService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/usuarios")
 public class UsuarioController {
@@ -13,6 +15,11 @@ public class UsuarioController {
 
     public UsuarioController(IUsuarioService usuarioService) {
         this.usuarioService = usuarioService;
+    }
+
+    @GetMapping
+    public ResponseEntity<List<UsuarioResponse>> listarTodos() {
+        return ResponseEntity.ok(usuarioService.listarTodos());
     }
 
     @GetMapping("/{id}")

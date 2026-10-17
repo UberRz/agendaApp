@@ -7,6 +7,8 @@ import com.agendaapp.repository.UsuarioRepository;
 import com.agendaapp.service.IUsuarioService;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class UsuarioServiceImpl implements IUsuarioService {
 
@@ -22,6 +24,20 @@ public class UsuarioServiceImpl implements IUsuarioService {
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado con id " + id));
 
         String tipo = (usuario instanceof Proveedor) ? "PROVEEDOR" : "CLIENTE";
-        return new UsuarioResponse(usuario.getId(), usuario.getNombre(), usuario.getEmail(), tipo);
+        return new UsuarioResponse(usuario.getId(), usuario.getNombre(), usuario.getEmail(),
+                usuario.getUsername(), usuario.getTelefono(), tipo);
+    }
+
+    @Override
+    public List<UsuarioResponse> listarTodos() {
+        return usuarioRepository.findAll().stream()
+                .map(this::mapearAResponse)
+                .toList();
+    }
+
+    private UsuarioResponse mapearAResponse(Usuario usuario) {
+        String tipo = (usuario instanceof Proveedor) ? "PROVEEDOR" : "CLIENTE";
+        return new UsuarioResponse(usuario.getId(), usuario.getNombre(), usuario.getEmail(),
+                usuario.getUsername(), usuario.getTelefono(), tipo);
     }
 }

@@ -7,21 +7,26 @@ import com.agendaapp.model.Proveedor;
 import com.agendaapp.model.Servicio;
 import com.agendaapp.model.Usuario;
 import com.agendaapp.repository.ServicioRepository;
+import com.agendaapp.repository.ReservaRepository;
 import com.agendaapp.repository.UsuarioRepository;
 import com.agendaapp.service.IServicioService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Service
 public class ServicioServiceImpl implements IServicioService {
 
     private final ServicioRepository servicioRepository;
+    private final ReservaRepository reservaRepository;
     private final UsuarioRepository usuarioRepository;
 
     public ServicioServiceImpl(ServicioRepository servicioRepository,
-                                UsuarioRepository usuarioRepository) {
+            ReservaRepository reservaRepository,
+            UsuarioRepository usuarioRepository) {
         this.servicioRepository = servicioRepository;
+        this.reservaRepository = reservaRepository;
         this.usuarioRepository = usuarioRepository;
     }
 
@@ -33,10 +38,13 @@ public class ServicioServiceImpl implements IServicioService {
                 request.getNombre(),
                 request.getDescripcion(),
                 request.getDuracion(),
-                request.getPrecio()
-        );
+                request.getPrecio(),
+                valorPorDefecto(request.getIdioma(), "General"),
+                valorPorDefecto(request.getNivel(), "No especificado"),
+                request.getFechaHora() == null ? LocalDateTime.now().plusDays(1) : request.getFechaHora(),
+                request.getCapacidad() == null ? 1 : request.getCapacidad());
 
-        proveedor.agregarServicio(servicio);
+        servicio.setProveedor(proveedor);
         Servicio guardado = servicioRepository.save(servicio);
 
         return mapearAResponse(guardado);
@@ -50,6 +58,14 @@ public class ServicioServiceImpl implements IServicioService {
         servicio.setDescripcion(request.getDescripcion());
         servicio.setDuracion(request.getDuracion());
         servicio.setPrecio(request.getPrecio());
+        servicio.setIdioma(valorPorDefecto(request.getIdioma(), servicio.getIdioma()));
+        servicio.setNivel(valorPorDefecto(request.getNivel(), servicio.getNivel()));
+        if (request.getFechaHora() != null) {
+            servicio.setFechaHora(request.getFechaHora());
+        }
+        if (request.getCapacidad() != null) {
+            servicio.setCapacidad(request.getCapacidad());
+        }
 
         return mapearAResponse(servicioRepository.save(servicio));
     }
@@ -109,7 +125,16 @@ public class ServicioServiceImpl implements IServicioService {
                 servicio.getDuracion(),
                 servicio.getPrecio(),
                 servicio.getProveedor().getId(),
-                servicio.getProveedor().getNombre()
-        );
+                servicio.getProveedor().getNombre(),
+                servicio.getIdioma(),
+                servicio.getNivel(),
+                servicio.getFechaHora(),
+                servicio.getCapacidad(),
+                Math.max(servicio.getCapacidad() - reservaRepository.countByServicioIdAndEstado(
+                        servicio.getId(), com.agendaapp.model.EstadoReserva.ACTIVA), 0));
+    }
+
+    private String valorPorDefecto(String valor, String porDefecto) {
+        return valor == null || valor.isBlank() ? porDefecto : valor.trim();
     }
 }

@@ -1,6 +1,7 @@
 package com.agendaapp.model;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,6 +24,18 @@ public class Servicio {
     @Column(nullable = false)
     private Double precio;
 
+    @Column(nullable = false, length = 40)
+    private String idioma;
+
+    @Column(nullable = false, length = 30)
+    private String nivel;
+
+    @Column(nullable = false)
+    private LocalDateTime fechaHora;
+
+    @Column(nullable = false)
+    private Integer capacidad;
+
     @ManyToOne
     @JoinColumn(name = "proveedor_id", nullable = false)
     private Proveedor proveedor;
@@ -34,11 +47,16 @@ public class Servicio {
         // constructor vacío requerido por JPA
     }
 
-    public Servicio(String nombre, String descripcion, Integer duracion, Double precio) {
+    public Servicio(String nombre, String descripcion, Integer duracion, Double precio,
+            String idioma, String nivel, LocalDateTime fechaHora, Integer capacidad) {
         this.nombre = nombre;
         this.descripcion = descripcion;
         this.duracion = duracion;
         this.precio = precio;
+        this.idioma = idioma;
+        this.nivel = nivel;
+        this.fechaHora = fechaHora;
+        this.capacidad = capacidad;
     }
 
     public Long getId() {
@@ -75,6 +93,38 @@ public class Servicio {
 
     public void setPrecio(Double precio) {
         this.precio = precio;
+    }
+
+    public String getIdioma() {
+        return idioma;
+    }
+
+    public void setIdioma(String idioma) {
+        this.idioma = idioma;
+    }
+
+    public String getNivel() {
+        return nivel;
+    }
+
+    public void setNivel(String nivel) {
+        this.nivel = nivel;
+    }
+
+    public LocalDateTime getFechaHora() {
+        return fechaHora;
+    }
+
+    public void setFechaHora(LocalDateTime fechaHora) {
+        this.fechaHora = fechaHora;
+    }
+
+    public Integer getCapacidad() {
+        return capacidad;
+    }
+
+    public void setCapacidad(Integer capacidad) {
+        this.capacidad = capacidad;
     }
 
     public Proveedor getProveedor() {

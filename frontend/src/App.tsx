@@ -1,1337 +1,516 @@
-import { useState } from "react";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { login, register, listServices, createService, createReservation, listClientReservations, listProviderReservations, cancelReservation, serviceToCourse, reservationToCourse, type ApiService, type ApiUser, type Role } from "./api";
 
 type Screen =
-  | "01_InicioSesion"
-  | "02_TipoUsuario"
-  | "03_RegistroUsuario"
-  | "04_RegistroProveedor"
-  | "05_TipoServicio"
-  | "06_Confirmacion_Usuario"
-  | "06_Confirmacion_Proveedor"
-  | "07_PanelUsuario"
-  | "08_PanelProveedor";
+  | "login"
+  | "account-type"
+  | "student-register"
+  | "staff-register"
+  | "language"
+  | "confirmation"
+  | "student-dashboard"
+  | "staff-dashboard"
+  | "student-classes"
+  | "staff-classes"
+  | "staff-availability"
+  | "history"
+  | "search"
+  | "booking-detail"
+  | "booking-success"
+  | "cancellation-success"
+  | "no-seats";
 
-type UserType = "usuario" | "proveedor" | null;
-type ServiceType = "clinica" | "consultorio" | "salon" | "deportivo" | "otro" | null;
+type IconName =
+  | "calendar"
+  | "book"
+  | "user"
+  | "users"
+  | "school"
+  | "clock"
+  | "history"
+  | "search"
+  | "check"
+  | "arrow"
+  | "eye"
+  | "eyeOff"
+  | "alert"
+  | "globe"
+  | "home"
+  | "menu"
+  | "close"
+  | "logout"
+  | "chevron"
+  | "filter";
 
-// ─── Icon Components ──────────────────────────────────────────────────────────
-
-function IconCalendar({ className = "w-6 h-6" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  );
-}
-
-function IconUser({ className = "w-6 h-6" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-}
-
-function IconBriefcase({ className = "w-6 h-6" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-    </svg>
-  );
-}
-
-function IconEye({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
-function IconEyeOff({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-      <line x1="1" y1="1" x2="23" y2="23" />
-    </svg>
-  );
-}
-
-function IconCheck({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-function IconCheckCircle({ className = "w-16 h-16" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-      <polyline points="22 4 12 14.01 9 11.01" />
-    </svg>
-  );
-}
-
-function IconAlertCircle({ className = "w-4 h-4" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="12" />
-      <line x1="12" y1="16" x2="12.01" y2="16" />
-    </svg>
-  );
-}
-
-function IconHospital({ className = "w-8 h-8" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <rect x="3" y="2" width="18" height="20" rx="1" />
-      <path d="M9 22V12h6v10" />
-      <path d="M12 7v4M10 9h4" />
-    </svg>
-  );
-}
-
-function IconStethoscope({ className = "w-8 h-8" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path d="M4.5 8.5a4 4 0 0 0 8 0V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v4.5z" />
-      <path d="M8.5 8.5A7 7 0 0 0 15.5 15.5" />
-      <circle cx="18" cy="18" r="3" />
-    </svg>
-  );
-}
-
-function IconScissors({ className = "w-8 h-8" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <circle cx="6" cy="6" r="3" />
-      <circle cx="6" cy="18" r="3" />
-      <line x1="20" y1="4" x2="8.12" y2="15.88" />
-      <line x1="14.47" y1="14.48" x2="20" y2="20" />
-      <line x1="8.12" y1="8.12" x2="12" y2="12" />
-    </svg>
-  );
-}
-
-function IconDumbbell({ className = "w-8 h-8" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path d="M6 4h4v4H6zM14 4h4v4h-4zM8 6h8M6 16h4v4H6zM14 16h4v4h-4zM8 18h8" />
-      <line x1="12" y1="6" x2="12" y2="18" />
-    </svg>
-  );
-}
-
-function IconGrid({ className = "w-8 h-8" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <rect x="3" y="3" width="7" height="7" />
-      <rect x="14" y="3" width="7" height="7" />
-      <rect x="14" y="14" width="7" height="7" />
-      <rect x="3" y="14" width="7" height="7" />
-    </svg>
-  );
-}
-
-function IconSearch({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-}
-
-function IconBell({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </svg>
-  );
-}
-
-function IconSettings({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  );
-}
-
-function IconArrowLeft({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <line x1="19" y1="12" x2="5" y2="12" />
-      <polyline points="12 19 5 12 12 5" />
-    </svg>
-  );
-}
-
-function IconPhone({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.61 4.38 2 2 0 0 1 3.6 2.18H6.6a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.09 6.09l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
-    </svg>
-  );
-}
-
-function IconMail({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-      <polyline points="22,6 12,13 2,6" />
-    </svg>
-  );
-}
-
-function IconStar({ className = "w-4 h-4" }: { className?: string }) {
-  return (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
-  );
-}
-
-function IconLogOut({ className = "w-5 h-5" }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  );
-}
-
-// ─── Shared Components ────────────────────────────────────────────────────────
-
-function Logo({ size = "md", dark = false }: { size?: "sm" | "md" | "lg"; dark?: boolean }) {
-  const textSize = size === "lg" ? "text-2xl" : size === "md" ? "text-xl" : "text-base";
-  return (
-    <div className="flex items-center gap-2">
-      <div className="w-8 h-8 rounded-lg bg-[#5B8DEF] flex items-center justify-center flex-shrink-0">
-        <IconCalendar className="w-4 h-4 text-white" />
-      </div>
-      <span className={`font-bold tracking-tight ${textSize} ${dark ? "text-white" : "text-[#1A2B4A]"}`}>
-        Agenda<span className="text-[#5B8DEF]">Fácil</span>
-      </span>
-    </div>
-  );
-}
-
-function ErrorMsg({ msg }: { msg: string }) {
-  return (
-    <div className="flex items-start gap-2 text-[#E85555] bg-[#FEF0F0] border border-[#E85555]/20 rounded-lg px-3 py-2.5 text-sm mt-1">
-      <IconAlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-      <span>{msg}</span>
-    </div>
-  );
-}
-
-function SuccessMsg({ msg }: { msg: string }) {
-  return (
-    <div className="flex items-start gap-2 text-[#3DB87A] bg-[#EDFAF3] border border-[#3DB87A]/20 rounded-lg px-3 py-2.5 text-sm mt-1">
-      <IconCheck className="w-4 h-4 mt-0.5 flex-shrink-0" />
-      <span>{msg}</span>
-    </div>
-  );
-}
-
-function InputField({
-  label,
-  type = "text",
-  placeholder,
-  value,
-  onChange,
-  helper,
-  error,
-  icon,
-  required = true,
-}: {
-  label: string;
-  type?: string;
-  placeholder?: string;
-  value: string;
-  onChange: (v: string) => void;
-  helper?: string;
-  error?: string;
-  icon?: React.ReactNode;
-  required?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-[#1A2B4A]">
-        {label}
-        {required && <span className="text-[#E85555] ml-0.5">*</span>}
-      </label>
-      <div className="relative">
-        {icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7A93]">{icon}</div>
-        )}
-        <input
-          type={type}
-          placeholder={placeholder}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className={`w-full ${icon ? "pl-10" : "pl-4"} pr-4 py-3 rounded-xl border text-[#1A2B4A] text-sm bg-white placeholder:text-[#9BA8BB] outline-none transition-all focus:ring-2 focus:ring-[#5B8DEF]/30 focus:border-[#5B8DEF] ${
-            error
-              ? "border-[#E85555] bg-[#FEF0F0]"
-              : "border-[#DDE4EF] hover:border-[#5B8DEF]/50"
-          }`}
-        />
-      </div>
-      {error && <ErrorMsg msg={error} />}
-      {!error && helper && <p className="text-xs text-[#6B7A93] mt-0.5">{helper}</p>}
-    </div>
-  );
-}
-
-function PasswordField({
-  label,
-  placeholder,
-  value,
-  onChange,
-  error,
-  helper,
-  required = true,
-}: {
-  label: string;
-  placeholder?: string;
-  value: string;
-  onChange: (v: string) => void;
-  error?: string;
-  helper?: string;
-  required?: boolean;
-}) {
-  const [show, setShow] = useState(false);
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-[#1A2B4A]">
-        {label}
-        {required && <span className="text-[#E85555] ml-0.5">*</span>}
-      </label>
-      <div className="relative">
-        <input
-          type={show ? "text" : "password"}
-          placeholder={placeholder || "••••••••"}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className={`w-full pl-4 pr-12 py-3 rounded-xl border text-[#1A2B4A] text-sm bg-white placeholder:text-[#9BA8BB] outline-none transition-all focus:ring-2 focus:ring-[#5B8DEF]/30 focus:border-[#5B8DEF] ${
-            error
-              ? "border-[#E85555] bg-[#FEF0F0]"
-              : "border-[#DDE4EF] hover:border-[#5B8DEF]/50"
-          }`}
-        />
-        <button
-          type="button"
-          onClick={() => setShow(!show)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7A93] hover:text-[#5B8DEF] transition-colors"
-          tabIndex={-1}
-          aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
-        >
-          {show ? <IconEyeOff /> : <IconEye />}
-        </button>
-      </div>
-      {error && <ErrorMsg msg={error} />}
-      {!error && helper && <p className="text-xs text-[#6B7A93] mt-0.5">{helper}</p>}
-    </div>
-  );
-}
-
-function PrimaryBtn({
-  children,
-  onClick,
-  type = "button",
-  full = true,
-  disabled = false,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  type?: "button" | "submit";
-  full?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className={`${full ? "w-full" : ""} bg-[#5B8DEF] hover:bg-[#4a7de0] active:bg-[#3a6dd0] disabled:bg-[#9BBAF8] text-white font-semibold py-3.5 px-6 rounded-xl transition-all duration-150 shadow-sm hover:shadow-md text-sm tracking-wide`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function SecondaryBtn({
-  children,
-  onClick,
-  full = true,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  full?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`${full ? "w-full" : ""} bg-white hover:bg-[#F7F9FC] active:bg-[#EBF1FD] text-[#5B8DEF] font-semibold py-3.5 px-6 rounded-xl border border-[#5B8DEF]/30 hover:border-[#5B8DEF] transition-all duration-150 text-sm tracking-wide`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function AppHeader({ onNavigate, isProvider = false }: { onNavigate: (s: Screen) => void; isProvider?: boolean }) {
-  return (
-    <header className="bg-white border-b border-[#DDE4EF] sticky top-0 z-50">
-      <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Logo />
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-[#6B7A93]">
-          {isProvider ? (
-            <>
-              <a href="#" className="hover:text-[#5B8DEF] transition-colors">Mis Servicios</a>
-              <a href="#" className="hover:text-[#5B8DEF] transition-colors">Reservas</a>
-              <a href="#" className="hover:text-[#5B8DEF] transition-colors">Disponibilidad</a>
-            </>
-          ) : (
-            <>
-              <a href="#" className="hover:text-[#5B8DEF] transition-colors">Buscar</a>
-              <a href="#" className="hover:text-[#5B8DEF] transition-colors">Mis Citas</a>
-              <a href="#" className="hover:text-[#5B8DEF] transition-colors">Historial</a>
-            </>
-          )}
-        </nav>
-        <div className="flex items-center gap-3">
-          <button className="p-2 rounded-lg text-[#6B7A93] hover:text-[#5B8DEF] hover:bg-[#EBF1FD] transition-all">
-            <IconBell />
-          </button>
-          <button className="p-2 rounded-lg text-[#6B7A93] hover:text-[#5B8DEF] hover:bg-[#EBF1FD] transition-all">
-            <IconSettings />
-          </button>
-          <div className="w-8 h-8 rounded-full bg-[#5B8DEF] flex items-center justify-center">
-            <span className="text-white text-xs font-bold">{isProvider ? "P" : "U"}</span>
-          </div>
-          <button
-            onClick={() => onNavigate("01_InicioSesion")}
-            className="flex items-center gap-1.5 text-sm text-[#6B7A93] hover:text-[#E85555] transition-colors"
-          >
-            <IconLogOut className="w-4 h-4" />
-            <span className="hidden md:block">Salir</span>
-          </button>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-// ─── Screen 01: Login ─────────────────────────────────────────────────────────
-
-function Screen01Login({ onNavigate }: { onNavigate: (s: Screen) => void }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState(false);
-
-  const VALID_USER = "demo";
-  const VALID_PASS = "Demo@1234";
-  const VALID_PROV = "proveedor";
-  const VALID_PROV_PASS = "Prov@1234";
-
-  const handleLogin = () => {
-    if (username === VALID_USER && password === VALID_PASS) {
-      onNavigate("07_PanelUsuario");
-    } else if (username === VALID_PROV && password === VALID_PROV_PASS) {
-      onNavigate("08_PanelProveedor");
-    } else {
-      setLoginError(true);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-0 bg-white rounded-2xl shadow-xl overflow-hidden">
-        {/* Left panel */}
-        <div className="bg-[#5B8DEF] p-10 flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-10 right-10 w-32 h-32 rounded-full bg-white" />
-            <div className="absolute bottom-20 left-5 w-48 h-48 rounded-full bg-white" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full bg-[#65C7A5]" />
-          </div>
-          <Logo dark size="lg" />
-          <div className="relative z-10">
-            <h2 className="text-3xl font-bold text-white leading-tight mb-4">
-              Organiza tus citas de forma fácil y segura
-            </h2>
-            <p className="text-blue-100 text-sm leading-relaxed">
-              Conectamos usuarios con proveedores de servicios para una experiencia de reserva sin complicaciones.
-            </p>
-            <div className="mt-8 flex flex-col gap-3">
-              {["Reserva en segundos", "Gestión en tiempo real", "Historial completo"].map((f) => (
-                <div key={f} className="flex items-center gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-[#65C7A5] flex items-center justify-center flex-shrink-0">
-                    <IconCheck className="w-3 h-3 text-white" />
-                  </div>
-                  <span className="text-white text-sm font-medium">{f}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="relative z-10 mt-6">
-            <div className="bg-white/15 rounded-xl p-4">
-              <p className="text-white/80 text-xs mb-2 font-medium">Credenciales de demo</p>
-              <div className="grid grid-cols-2 gap-3 text-xs text-white/90">
-                <div>
-                  <p className="font-semibold text-[#65C7A5]">Usuario</p>
-                  <p>usuario: <span className="font-mono bg-white/10 px-1 rounded">demo</span></p>
-                  <p>clave: <span className="font-mono bg-white/10 px-1 rounded">Demo@1234</span></p>
-                </div>
-                <div>
-                  <p className="font-semibold text-[#65C7A5]">Proveedor</p>
-                  <p>usuario: <span className="font-mono bg-white/10 px-1 rounded">proveedor</span></p>
-                  <p>clave: <span className="font-mono bg-white/10 px-1 rounded">Prov@1234</span></p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right panel */}
-        <div className="p-10 flex flex-col justify-center">
-          <h1 className="text-2xl font-bold text-[#1A2B4A] mb-1.5">Iniciar sesión</h1>
-          <p className="text-sm text-[#6B7A93] mb-8">Ingresa tus credenciales para continuar.</p>
-
-          {loginError && (
-            <div className="mb-6 flex items-start gap-2.5 bg-[#FEF0F0] border border-[#E85555]/25 rounded-xl p-4">
-              <IconAlertCircle className="w-5 h-5 text-[#E85555] flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-[#E85555]">Credenciales incorrectas</p>
-                <p className="text-sm text-[#E85555]/80 mt-0.5">El usuario o la contraseña no son válidos.</p>
-              </div>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-5">
-            <InputField
-              label="Nombre de usuario"
-              placeholder="Ej. juan.garcia"
-              value={username}
-              onChange={(v) => { setUsername(v); setLoginError(false); }}
-              error={loginError ? "" : undefined}
-              icon={<IconUser className="w-4 h-4" />}
-            />
-            <PasswordField
-              label="Contraseña"
-              value={password}
-              onChange={(v) => { setPassword(v); setLoginError(false); }}
-              error={loginError ? "" : undefined}
-            />
-          </div>
-
-          <div className="mt-8 flex flex-col gap-3">
-            <PrimaryBtn onClick={handleLogin}>Iniciar sesión</PrimaryBtn>
-            <SecondaryBtn onClick={() => onNavigate("02_TipoUsuario")}>Crear una cuenta</SecondaryBtn>
-          </div>
-
-          <p className="text-center text-xs text-[#6B7A93] mt-6">
-            ¿Nuevo en Agenda Fácil?{" "}
-            <button
-              onClick={() => onNavigate("02_TipoUsuario")}
-              className="text-[#5B8DEF] font-medium hover:underline"
-            >
-              Crea tu cuenta gratis
-            </button>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Screen 02: Select User Type ──────────────────────────────────────────────
-
-function Screen02TipoUsuario({ onNavigate }: { onNavigate: (s: Screen) => void }) {
-  const [selected, setSelected] = useState<UserType>(null);
-  const [error, setError] = useState(false);
-
-  const handleContinue = () => {
-    if (!selected) { setError(true); return; }
-    onNavigate(selected === "usuario" ? "03_RegistroUsuario" : "04_RegistroProveedor");
-  };
-
-  return (
-    <div className="min-h-screen bg-[#F7F9FC] flex flex-col">
-      <div className="bg-white border-b border-[#DDE4EF] px-6 py-4">
-        <div className="max-w-2xl mx-auto">
-          <Logo />
-        </div>
-      </div>
-
-      <div className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-2xl">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 bg-[#EBF1FD] text-[#5B8DEF] text-xs font-semibold px-3 py-1.5 rounded-full mb-4">
-              <span>Paso 1 de 3</span>
-            </div>
-            <h1 className="text-3xl font-bold text-[#1A2B4A] mb-3">¿Qué tipo de cuenta necesitas?</h1>
-            <p className="text-[#6B7A93]">Selecciona una opción para continuar con tu registro.</p>
-          </div>
-
-          {error && (
-            <div className="mb-6">
-              <ErrorMsg msg="Selecciona un tipo de cuenta para continuar." />
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-            {/* Usuario card */}
-            <button
-              onClick={() => { setSelected("usuario"); setError(false); }}
-              className={`relative text-left p-6 rounded-2xl border-2 transition-all duration-200 group ${
-                selected === "usuario"
-                  ? "border-[#5B8DEF] bg-[#EBF1FD] shadow-md"
-                  : "border-[#DDE4EF] bg-white hover:border-[#5B8DEF]/50 hover:shadow-sm"
-              }`}
-              aria-pressed={selected === "usuario"}
-            >
-              {selected === "usuario" && (
-                <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-[#5B8DEF] flex items-center justify-center">
-                  <IconCheck className="w-3.5 h-3.5 text-white" />
-                </div>
-              )}
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors ${
-                selected === "usuario" ? "bg-[#5B8DEF] text-white" : "bg-[#F7F9FC] text-[#5B8DEF] group-hover:bg-[#EBF1FD]"
-              }`}>
-                <IconUser className="w-7 h-7" />
-              </div>
-              <h3 className={`text-lg font-bold mb-2 ${selected === "usuario" ? "text-[#5B8DEF]" : "text-[#1A2B4A]"}`}>
-                Usuario
-              </h3>
-              <p className="text-sm text-[#6B7A93] leading-relaxed">
-                Quiero reservar servicios y gestionar mis citas.
-              </p>
-            </button>
-
-            {/* Proveedor card */}
-            <button
-              onClick={() => { setSelected("proveedor"); setError(false); }}
-              className={`relative text-left p-6 rounded-2xl border-2 transition-all duration-200 group ${
-                selected === "proveedor"
-                  ? "border-[#65C7A5] bg-[#E8F7F2] shadow-md"
-                  : "border-[#DDE4EF] bg-white hover:border-[#65C7A5]/50 hover:shadow-sm"
-              }`}
-              aria-pressed={selected === "proveedor"}
-            >
-              {selected === "proveedor" && (
-                <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-[#65C7A5] flex items-center justify-center">
-                  <IconCheck className="w-3.5 h-3.5 text-white" />
-                </div>
-              )}
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors ${
-                selected === "proveedor" ? "bg-[#65C7A5] text-white" : "bg-[#F7F9FC] text-[#65C7A5] group-hover:bg-[#E8F7F2]"
-              }`}>
-                <IconBriefcase className="w-7 h-7" />
-              </div>
-              <h3 className={`text-lg font-bold mb-2 ${selected === "proveedor" ? "text-[#65C7A5]" : "text-[#1A2B4A]"}`}>
-                Proveedor
-              </h3>
-              <p className="text-sm text-[#6B7A93] leading-relaxed">
-                Quiero ofrecer servicios y gestionar mis reservas.
-              </p>
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <PrimaryBtn onClick={handleContinue}>Continuar</PrimaryBtn>
-            <SecondaryBtn onClick={() => onNavigate("01_InicioSesion")}>
-              <span className="flex items-center justify-center gap-2">
-                <IconArrowLeft className="w-4 h-4" />
-                Volver al inicio de sesión
-              </span>
-            </SecondaryBtn>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Shared Registration Form ─────────────────────────────────────────────────
-
-type RegState = {
-  nombre: string;
-  email: string;
-  username: string;
-  password: string;
-  telefono: string;
-  negocio?: string;
+const paths: Record<IconName, ReactNode> = {
+  calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></>,
+  book: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/><path d="M8 7h8M8 11h6"/></>,
+  user: <><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>,
+  users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>,
+  school: <><path d="m3 10 9-6 9 6-9 6-9-6Z"/><path d="M7 13.5V18l5 3 5-3v-4.5M21 10v6"/></>,
+  clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+  history: <><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></>,
+  search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
+  check: <path d="m5 12 4 4L19 6"/>,
+  arrow: <><path d="m9 18 6-6-6-6"/></>,
+  eye: <><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></>,
+  eyeOff: <><path d="m3 3 18 18M10.6 6.2c.46-.13.93-.2 1.4-.2 6.5 0 10 6 10 6a18 18 0 0 1-2.1 2.8M6.6 6.6C3.5 8.4 2 12 2 12s3.5 6 10 6c1.7 0 3.15-.4 4.36-1M10.6 10.6a2 2 0 0 0 2.8 2.8"/></>,
+  alert: <><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v4M12 17h.01"/></>,
+  globe: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></>,
+  home: <><path d="m3 11 9-8 9 8"/><path d="M5 10v11h14V10M9 21v-7h6v7"/></>,
+  menu: <path d="M4 6h16M4 12h16M4 18h16"/>,
+  close: <path d="m6 6 12 12M18 6 6 18"/>,
+  logout: <><path d="M10 17l5-5-5-5M15 12H3M15 3h5v18h-5"/></>,
+  chevron: <path d="m9 18 6-6-6-6"/>,
+  filter: <path d="M4 5h16M7 12h10M10 19h4"/>,
 };
 
-type RegErrors = Partial<Record<keyof RegState | "general", string>>;
-type RegSuccess = { show: boolean };
-
-// Simulate taken emails/usernames
-const TAKEN_EMAILS = ["admin@agendafacil.com", "test@test.com", "correoexistente@ejemplo.com"];
-const TAKEN_USERNAMES = ["admin", "superuser", "demo", "proveedor", "usuarioexistente"];
-
-function validatePassword(p: string): string | undefined {
-  if (!p) return "La contraseña debe tener mínimo 8 caracteres y al menos un símbolo.";
-  if (p.length < 8 || !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(p)) {
-    return "La contraseña debe tener mínimo 8 caracteres y al menos un símbolo.";
-  }
-  return undefined;
+function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
-// ─── Screen 03: User Registration ────────────────────────────────────────────
+function Button({ children, onClick, variant = "primary", type = "button", disabled = false, icon }: { children: ReactNode; onClick?: () => void; variant?: "primary" | "secondary" | "ghost" | "danger"; type?: "button" | "submit"; disabled?: boolean; icon?: IconName }) {
+  return <button className={`button ${variant}`} onClick={onClick} type={type} disabled={disabled}>{children}{icon && <Icon name={icon} size={18}/>}</button>;
+}
 
-function Screen03RegistroUsuario({ onNavigate }: { onNavigate: (s: Screen) => void }) {
-  const [f, setF] = useState<RegState>({ nombre: "", email: "", username: "", password: "", telefono: "" });
-  const [errors, setErrors] = useState<RegErrors>({});
-  const [success, setSuccess] = useState<RegSuccess>({ show: false });
+function Brand({ compact = false }: { compact?: boolean }) {
+  return <div className="brand"><span className="brand-mark"><Icon name="calendar" size={compact ? 19 : 23}/></span><span>Agenda <b>Fácil</b></span></div>;
+}
 
-  const update = (k: keyof RegState) => (v: string) => {
-    setF((prev) => ({ ...prev, [k]: v }));
-    setErrors((prev) => ({ ...prev, [k]: undefined, general: undefined }));
-  };
+function Field({ label, name, type = "text", placeholder, value, onChange, error, helper, required = true }: { label: string; name: string; type?: string; placeholder?: string; value: string; onChange: (value: string) => void; error?: string; helper?: string; required?: boolean }) {
+  const [visible, setVisible] = useState(false);
+  const password = type === "password";
+  return <label className={`field ${error ? "field-error" : ""}`}><span>{label}{required && <em>*</em>}</span><div className="input-wrap"><input name={name} type={password && visible ? "text" : type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}/>{password && <button type="button" className="icon-button" aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"} onClick={() => setVisible(!visible)}><Icon name={visible ? "eyeOff" : "eye"}/></button>}</div>{error ? <small className="field-message error-text"><Icon name="alert" size={14}/>{error}</small> : helper && <small>{helper}</small>}</label>;
+}
 
-  // While a duplicate email/username is present, registration must be blocked.
-  const emailTaken = TAKEN_EMAILS.includes(f.email.trim().toLowerCase());
-  const usernameTaken = TAKEN_USERNAMES.includes(f.username.trim().toLowerCase());
-  const blocked = emailTaken || usernameTaken;
+function Notice({ kind, children }: { kind: "error" | "success" | "info"; children: ReactNode }) {
+  return <div className={`notice ${kind}`}><span className="notice-icon"><Icon name={kind === "error" ? "alert" : "check"} size={17}/></span><span>{children}</span></div>;
+}
 
-  const handleSubmit = () => {
-    const e: RegErrors = {};
-    if (!f.nombre.trim()) e.nombre = "El nombre completo es obligatorio.";
-    if (!f.email.trim()) e.email = "El correo electrónico es obligatorio.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) e.email = "Utiliza un correo electrónico válido.";
-    else if (TAKEN_EMAILS.includes(f.email.toLowerCase())) e.email = "Este correo electrónico ya está registrado. Utiliza otro correo.";
-    if (!f.username.trim()) e.username = "El nombre de usuario es obligatorio.";
-    else if (TAKEN_USERNAMES.includes(f.username.toLowerCase())) e.username = "Este nombre de usuario ya está registrado. Elige otro.";
-    const pwErr = validatePassword(f.password);
-    if (pwErr) e.password = pwErr;
-    if (!f.telefono.trim()) e.telefono = "El número telefónico es obligatorio.";
-    if (Object.keys(e).length > 0) {
-      setErrors({ ...e, general: "Completa todos los campos obligatorios para continuar." });
-      return;
+function Badge({ children, tone = "blue" }: { children: ReactNode; tone?: "blue" | "green" | "amber" | "red" | "gray" }) {
+  return <span className={`badge ${tone}`}><span className="badge-dot"/>{children}</span>;
+}
+
+function Header({ role, current, navigate, user }: { role: Role; current: string; navigate: (s: Screen) => void; user?: ApiUser | null }) {
+  const [open, setOpen] = useState(false);
+  const studentItems = [
+    ["Inicio", "student-dashboard", "home"], ["Clases disponibles", "search", "search"], ["Mis clases", "student-classes", "calendar"], ["Historial", "history", "history"],
+  ] as [string, Screen, IconName][];
+  const staffItems = [
+    ["Inicio", "staff-dashboard", "home"], ["Clases agendadas", "staff-classes", "calendar"], ["Historial", "history", "history"], ["Disponibilidad", "staff-availability", "clock"],
+  ] as [string, Screen, IconName][];
+  const items = role === "student" ? studentItems : staffItems;
+  const profileName = user?.nombre || (role === "student" ? "Estudiante" : "Personal de academia");
+  const profileInitials = user?.nombre ? user.nombre.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() : role === "student" ? "ES" : "PA";
+  return <header className="app-header"><div className="header-inner"><Brand compact/><nav className={open ? "nav open" : "nav"}>{items.map(([label, screen, icon]) => <button key={label} className={current === screen ? "nav-item active" : "nav-item"} onClick={() => { navigate(screen); setOpen(false); }}><Icon name={icon} size={17}/>{label}</button>)}</nav><div className="profile"><span className="avatar">{profileInitials}</span><span className="profile-copy"><b>{profileName}</b><small>{user?.tipoUsuario === "PROVEEDOR" || role === "staff" ? "Personal de academia" : "Estudiante"}</small></span><button className="icon-button desktop-only" aria-label="Cerrar sesión" onClick={() => navigate("login")}><Icon name="logout"/></button></div><button className="menu-button" aria-label="Abrir menú" onClick={() => setOpen(!open)}><Icon name={open ? "close" : "menu"}/></button></div></header>;
+}
+
+function Page({ role, current, navigate, user, children }: { role: Role; current: string; navigate: (s: Screen) => void; user?: ApiUser | null; children: ReactNode }) {
+  return <div className="app-shell"><Header role={role} current={current} navigate={navigate} user={user}/><main className="page">{children}</main></div>;
+}
+
+function PageHeading({ eyebrow, title, subtitle, action }: { eyebrow?: string; title: string; subtitle: string; action?: ReactNode }) {
+  return <div className="page-heading"><div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h1>{title}</h1><p>{subtitle}</p></div>{action}</div>;
+}
+
+function AuthLayout({ children, step }: { children: ReactNode; step?: string }) {
+  return <div className="auth-page"><div className="auth-brand"><Brand/><div className="auth-illustration"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><span className="floating-card card-a"><Icon name="book" size={28}/></span><span className="floating-card card-b"><Icon name="globe" size={25}/></span><div className="illustration-main"><span><Icon name="school" size={55}/></span></div></div><div className="auth-message"><span className="eyebrow light">Tu aprendizaje, a tu ritmo</span><h2>Organiza tus clases de forma fácil y segura</h2><p>Reserva, consulta y gestiona tus clases de idiomas en un solo lugar.</p></div><div className="trust-row"><span><Icon name="check" size={15}/> Horarios claros</span><span><Icon name="check" size={15}/> Reserva segura</span></div></div><main className="auth-content">{step && <span className="step">{step}</span>}{children}</main></div>;
+}
+
+const initialForm = { name: "", email: "", username: "", password: "", phone: "", academy: "" };
+
+function Login({ navigate, setRole, setUser }: { navigate: (s: Screen) => void; setRole: (r: Role) => void; setUser: (user: ApiUser) => void }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const user = await login(username.trim(), password);
+      const nextRole = user.tipoUsuario === "PROVEEDOR" ? "staff" : "student";
+      setUser(user);
+      setRole(nextRole);
+      navigate(nextRole === "student" ? "student-dashboard" : "staff-dashboard");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "El usuario o la contraseña no son válidos.");
+    } finally {
+      setSubmitting(false);
     }
-    setSuccess({ show: true });
-  };
-
-  if (success.show) {
-    return (
-      <div className="min-h-screen bg-[#F7F9FC] flex flex-col">
-        <div className="bg-white border-b border-[#DDE4EF] px-6 py-4">
-          <div className="max-w-xl mx-auto"><Logo /></div>
-        </div>
-        <div className="flex-1 flex items-center justify-center px-4 py-12">
-          <div className="bg-white rounded-2xl shadow-lg p-10 max-w-md w-full text-center">
-            <div className="w-20 h-20 rounded-full bg-[#EDFAF3] flex items-center justify-center mx-auto mb-6">
-              <IconCheckCircle className="w-10 h-10 text-[#3DB87A]" />
-            </div>
-            <h2 className="text-2xl font-bold text-[#1A2B4A] mb-2">¡Cuenta creada con éxito!</h2>
-            <p className="text-[#6B7A93] mb-8">Tu registro se completó correctamente. Ya puedes empezar a reservar servicios.</p>
-            <PrimaryBtn onClick={() => onNavigate("06_Confirmacion_Usuario")}>Continuar</PrimaryBtn>
-          </div>
-        </div>
-      </div>
-    );
   }
-
-  return (
-    <div className="min-h-screen bg-[#F7F9FC] flex flex-col">
-      <div className="bg-white border-b border-[#DDE4EF] px-6 py-4">
-        <div className="max-w-xl mx-auto"><Logo /></div>
-      </div>
-
-      <div className="flex-1 flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-xl">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 bg-[#EBF1FD] text-[#5B8DEF] text-xs font-semibold px-3 py-1.5 rounded-full mb-4">
-              <span>Paso 2 de 3</span>
-            </div>
-            <h1 className="text-3xl font-bold text-[#1A2B4A] mb-2">Crea tu cuenta</h1>
-            <p className="text-[#6B7A93]">Ingresa tus datos para comenzar a utilizar Agenda Fácil.</p>
-          </div>
-
-          {errors.general && (
-            <div className="mb-6">
-              <ErrorMsg msg={errors.general} />
-            </div>
-          )}
-
-          <div className="bg-white rounded-2xl shadow-sm border border-[#DDE4EF] p-8 flex flex-col gap-5">
-            <InputField label="Nombre completo" placeholder="Ej. Juan García López" value={f.nombre} onChange={update("nombre")} error={errors.nombre} icon={<IconUser className="w-4 h-4" />} />
-            <InputField label="Correo electrónico" type="email" placeholder="ejemplo@correo.com" value={f.email} onChange={update("email")} error={errors.email} helper="Utiliza un correo electrónico válido." icon={<IconMail className="w-4 h-4" />} />
-            <InputField label="Nombre de usuario" placeholder="juangarcia" value={f.username} onChange={update("username")} error={errors.username} helper="El nombre de usuario debe ser único." />
-            <PasswordField label="Contraseña" value={f.password} onChange={update("password")} error={errors.password} helper="Mínimo 8 caracteres y al menos un símbolo." />
-            <InputField label="Número telefónico" type="tel" placeholder="+1 (555) 123-4567" value={f.telefono} onChange={update("telefono")} error={errors.telefono} icon={<IconPhone className="w-4 h-4" />} />
-          </div>
-
-          <div className="flex flex-col gap-3 mt-6">
-            <PrimaryBtn onClick={handleSubmit} disabled={blocked}>Crear cuenta</PrimaryBtn>
-            {blocked && (
-              <p className="text-xs text-[#E85555] text-center -mt-1">
-                No es posible completar el registro con {emailTaken ? "este correo" : "este nombre de usuario"}.
-              </p>
-            )}
-            <SecondaryBtn onClick={() => onNavigate("02_TipoUsuario")}>
-              <span className="flex items-center justify-center gap-2">
-                <IconArrowLeft className="w-4 h-4" />
-                Volver
-              </span>
-            </SecondaryBtn>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <AuthLayout><div className="auth-form login-form"><span className="mobile-brand"><Brand/></span><div className="form-heading"><span className="eyebrow">Bienvenido de nuevo</span><h1>Inicia sesión</h1><p>Accede a tu cuenta para continuar aprendiendo.</p></div>{error && <Notice kind="error">{error}</Notice>}<form onSubmit={submit}><Field label="Nombre de usuario o correo" name="username" value={username} onChange={(v) => { setUsername(v); setError(""); }} placeholder="Escribe tu usuario o correo" error={error ? "Revisa los datos ingresados." : undefined}/><Field label="Contraseña" name="password" type="password" value={password} onChange={(v) => { setPassword(v); setError(""); }} placeholder="Ingresa tu contraseña" error={error ? "Revisa los datos ingresados." : undefined}/><Button type="submit" disabled={submitting} icon="arrow">{submitting ? "Ingresando..." : "Iniciar sesión"}</Button></form><div className="demo-box"><b>Acceso de demostración</b><p>Usa las credenciales configuradas en PostgreSQL.</p></div><div className="divider"><span>¿Aún no tienes cuenta?</span></div><Button variant="secondary" onClick={() => navigate("account-type")}>Crear una cuenta</Button><p className="auth-footnote">Para estudiantes y personal de la academia.</p></div></AuthLayout>;
 }
 
-// ─── Screen 04: Provider Registration ────────────────────────────────────────
-
-function Screen04RegistroProveedor({ onNavigate }: { onNavigate: (s: Screen) => void }) {
-  const [f, setF] = useState<RegState>({ nombre: "", email: "", username: "", password: "", telefono: "", negocio: "" });
-  const [errors, setErrors] = useState<RegErrors>({});
-
-  const update = (k: keyof RegState) => (v: string) => {
-    setF((prev) => ({ ...prev, [k]: v }));
-    setErrors((prev) => ({ ...prev, [k]: undefined, general: undefined }));
-  };
-
-  const handleSubmit = () => {
-    const e: RegErrors = {};
-    if (!f.nombre.trim()) e.nombre = "El nombre completo es obligatorio.";
-    if (!f.email.trim()) e.email = "El correo electrónico es obligatorio.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) e.email = "Utiliza un correo electrónico válido.";
-    else if (TAKEN_EMAILS.includes(f.email.toLowerCase())) e.email = "Este correo electrónico ya está registrado. Utiliza otro correo.";
-    if (!f.username.trim()) e.username = "El nombre de usuario es obligatorio.";
-    else if (TAKEN_USERNAMES.includes(f.username.toLowerCase())) e.username = "Este nombre de usuario ya está registrado. Elige otro.";
-    const pwErr = validatePassword(f.password);
-    if (pwErr) e.password = pwErr;
-    if (!f.telefono.trim()) e.telefono = "El número telefónico es obligatorio.";
-    if (!f.negocio?.trim()) e.negocio = "El nombre del negocio es obligatorio.";
-    if (Object.keys(e).length > 0) {
-      setErrors({ ...e, general: "Completa todos los campos obligatorios para continuar." });
-      return;
-    }
-    onNavigate("05_TipoServicio");
-  };
-
-  return (
-    <div className="min-h-screen bg-[#F7F9FC] flex flex-col">
-      <div className="bg-white border-b border-[#DDE4EF] px-6 py-4">
-        <div className="max-w-xl mx-auto"><Logo /></div>
-      </div>
-
-      <div className="flex-1 flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-xl">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 bg-[#E8F7F2] text-[#65C7A5] text-xs font-semibold px-3 py-1.5 rounded-full mb-4">
-              <span>Paso 2 de 4</span>
-            </div>
-            <h1 className="text-3xl font-bold text-[#1A2B4A] mb-2">Registra tu negocio</h1>
-            <p className="text-[#6B7A93]">Completa tus datos para comenzar a ofrecer servicios.</p>
-          </div>
-
-          {errors.general && (
-            <div className="mb-6">
-              <ErrorMsg msg={errors.general} />
-            </div>
-          )}
-
-          <div className="bg-white rounded-2xl shadow-sm border border-[#DDE4EF] p-8 flex flex-col gap-5">
-            <InputField label="Nombre completo" placeholder="Ej. María Torres" value={f.nombre} onChange={update("nombre")} error={errors.nombre} icon={<IconUser className="w-4 h-4" />} />
-            <InputField label="Correo electrónico" type="email" placeholder="negocio@correo.com" value={f.email} onChange={update("email")} error={errors.email} helper="Utiliza un correo electrónico válido." icon={<IconMail className="w-4 h-4" />} />
-            <InputField label="Nombre de usuario" placeholder="mi_negocio" value={f.username} onChange={update("username")} error={errors.username} helper="El nombre de usuario debe ser único." />
-            <PasswordField label="Contraseña" value={f.password} onChange={update("password")} error={errors.password} helper="Mínimo 8 caracteres y al menos un símbolo." />
-            <InputField label="Número telefónico" type="tel" placeholder="+1 (555) 123-4567" value={f.telefono} onChange={update("telefono")} error={errors.telefono} icon={<IconPhone className="w-4 h-4" />} />
-            <InputField label="Nombre del negocio" placeholder="Ej. Clínica Central, Salón Bella Vista" value={f.negocio || ""} onChange={update("negocio")} error={errors.negocio} />
-          </div>
-
-          <div className="flex flex-col gap-3 mt-6">
-            <PrimaryBtn onClick={handleSubmit}>Continuar</PrimaryBtn>
-            <SecondaryBtn onClick={() => onNavigate("02_TipoUsuario")}>
-              <span className="flex items-center justify-center gap-2">
-                <IconArrowLeft className="w-4 h-4" />
-                Volver
-              </span>
-            </SecondaryBtn>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Screen 05: Service Type ──────────────────────────────────────────────────
-
-const SERVICE_OPTIONS: { id: ServiceType; label: string; desc: string; icon: React.ReactNode }[] = [
-  { id: "clinica", label: "Clínica", desc: "Atención médica y cuidados de salud.", icon: <IconHospital /> },
-  { id: "consultorio", label: "Consultorio", desc: "Consultas profesionales especializadas.", icon: <IconStethoscope /> },
-  { id: "salon", label: "Salón de belleza", desc: "Servicios de estética y belleza.", icon: <IconScissors /> },
-  { id: "deportivo", label: "Centro deportivo", desc: "Instalaciones deportivas y fitness.", icon: <IconDumbbell /> },
-  { id: "otro", label: "Otro", desc: "Cualquier otro tipo de servicio.", icon: <IconGrid /> },
-];
-
-function Screen05TipoServicio({ onNavigate }: { onNavigate: (s: Screen) => void }) {
-  const [selected, setSelected] = useState<ServiceType>(null);
+function AccountType({ navigate }: { navigate: (s: Screen) => void }) {
+  const [selected, setSelected] = useState<Role | null>(null);
   const [error, setError] = useState(false);
-
-  const handleContinue = () => {
-    if (!selected) { setError(true); return; }
-    onNavigate("06_Confirmacion_Proveedor");
-  };
-
-  return (
-    <div className="min-h-screen bg-[#F7F9FC] flex flex-col">
-      <div className="bg-white border-b border-[#DDE4EF] px-6 py-4">
-        <div className="max-w-2xl mx-auto"><Logo /></div>
-      </div>
-
-      <div className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-2xl">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 bg-[#E8F7F2] text-[#65C7A5] text-xs font-semibold px-3 py-1.5 rounded-full mb-4">
-              <span>Paso 3 de 4</span>
-            </div>
-            <h1 className="text-3xl font-bold text-[#1A2B4A] mb-3">¿Qué tipo de servicio ofreces?</h1>
-            <p className="text-[#6B7A93]">Selecciona una categoría para clasificar tu servicio.</p>
-          </div>
-
-          {error && (
-            <div className="mb-6">
-              <ErrorMsg msg="Selecciona un tipo de servicio para continuar." />
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-            {SERVICE_OPTIONS.map((opt) => (
-              <button
-                key={opt.id}
-                onClick={() => { setSelected(opt.id); setError(false); }}
-                className={`relative text-left p-5 rounded-2xl border-2 transition-all duration-200 group ${
-                  selected === opt.id
-                    ? "border-[#65C7A5] bg-[#E8F7F2] shadow-md"
-                    : "border-[#DDE4EF] bg-white hover:border-[#65C7A5]/50 hover:shadow-sm"
-                }`}
-                aria-pressed={selected === opt.id}
-              >
-                {selected === opt.id && (
-                  <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-[#65C7A5] flex items-center justify-center">
-                    <IconCheck className="w-3.5 h-3.5 text-white" />
-                  </div>
-                )}
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
-                  selected === opt.id ? "bg-[#65C7A5] text-white" : "bg-[#F7F9FC] text-[#65C7A5] group-hover:bg-[#E8F7F2]"
-                }`}>
-                  {opt.icon}
-                </div>
-                <h3 className={`font-bold mb-1 text-sm ${selected === opt.id ? "text-[#2d9e7a]" : "text-[#1A2B4A]"}`}>
-                  {opt.label}
-                </h3>
-                <p className="text-xs text-[#6B7A93] leading-relaxed">{opt.desc}</p>
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <PrimaryBtn onClick={handleContinue}>Continuar</PrimaryBtn>
-            <SecondaryBtn onClick={() => onNavigate("04_RegistroProveedor")}>
-              <span className="flex items-center justify-center gap-2">
-                <IconArrowLeft className="w-4 h-4" />
-                Volver
-              </span>
-            </SecondaryBtn>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  function next() {
+    if (!selected) return setError(true);
+    navigate(selected === "student" ? "student-register" : "staff-register");
+  }
+  return <AuthLayout step="Paso 1 de 2"><div className="auth-form wide"><span className="mobile-brand"><Brand/></span><div className="form-heading"><span className="eyebrow">Crea tu cuenta</span><h1>¿Qué tipo de cuenta necesitas?</h1><p>Selecciona una opción para continuar con tu registro.</p></div><div className="selection-grid"><SelectionCard icon="user" title="Estudiante" description="Quiero reservar clases y gestionar mis horarios." selected={selected === "student"} onClick={() => { setSelected("student"); setError(false); }}/><SelectionCard icon="school" title="Personal de la academia" description="Quiero gestionar clases y consultar las reservas." selected={selected === "staff"} onClick={() => { setSelected("staff"); setError(false); }}/></div>{error && <Notice kind="error">Selecciona un tipo de cuenta para continuar.</Notice>}<div className="form-actions"><Button variant="secondary" onClick={() => navigate("login")}>Volver</Button><Button onClick={next} icon="arrow">Continuar</Button></div></div></AuthLayout>;
 }
 
-// ─── Screen 06: Confirmation ──────────────────────────────────────────────────
-
-function Screen06Confirmacion({ onNavigate, isProvider }: { onNavigate: (s: Screen) => void; isProvider: boolean }) {
-  return (
-    <div className="min-h-screen bg-[#F7F9FC] flex flex-col">
-      <div className="bg-white border-b border-[#DDE4EF] px-6 py-4">
-        <div className="max-w-xl mx-auto"><Logo /></div>
-      </div>
-
-      <div className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="bg-white rounded-2xl shadow-lg border border-[#DDE4EF] p-12 max-w-lg w-full text-center">
-          <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 ${isProvider ? "bg-[#E8F7F2]" : "bg-[#EDFAF3]"}`}>
-            <IconCheckCircle className={`w-12 h-12 ${isProvider ? "text-[#65C7A5]" : "text-[#3DB87A]"}`} />
-          </div>
-
-          <h1 className="text-3xl font-bold text-[#1A2B4A] mb-3">
-            {isProvider ? "¡Registro completado!" : "¡Tu cuenta está lista!"}
-          </h1>
-          <p className="text-[#6B7A93] mb-2 leading-relaxed">
-            {isProvider
-              ? "Tu cuenta y tipo de servicio fueron registrados correctamente."
-              : "Tu registro se completó correctamente."}
-          </p>
-          <p className="text-sm text-[#6B7A93] mb-10">
-            Ahora puedes iniciar sesión y {isProvider ? "comenzar a gestionar tus reservas" : "empezar a reservar servicios"}.
-          </p>
-
-          <div className={`rounded-xl p-4 mb-8 ${isProvider ? "bg-[#E8F7F2]" : "bg-[#EBF1FD]"}`}>
-            <p className={`text-sm font-semibold mb-1 ${isProvider ? "text-[#2d9e7a]" : "text-[#5B8DEF]"}`}>
-              Pasos completados:
-            </p>
-            {[
-              "Selección de tipo de cuenta",
-              isProvider ? "Datos del negocio registrados" : "Información personal registrada",
-              ...(isProvider ? ["Tipo de servicio seleccionado"] : []),
-            ].map((s) => (
-              <div key={s} className="flex items-center gap-2 mt-1.5">
-                <div className={`w-4 h-4 rounded-full flex items-center justify-center ${isProvider ? "bg-[#65C7A5]" : "bg-[#5B8DEF]"}`}>
-                  <IconCheck className="w-2.5 h-2.5 text-white" />
-                </div>
-                <span className="text-sm text-[#1A2B4A]">{s}</span>
-              </div>
-            ))}
-          </div>
-
-          <PrimaryBtn onClick={() => onNavigate("01_InicioSesion")}>
-            Ir al inicio de sesión
-          </PrimaryBtn>
-        </div>
-      </div>
-    </div>
-  );
+function SelectionCard({ icon, title, description, selected, onClick }: { icon: IconName; title: string; description: string; selected: boolean; onClick: () => void }) {
+  return <button className={`selection-card ${selected ? "selected" : ""}`} onClick={onClick}><span className="selection-icon"><Icon name={icon} size={28}/></span>{selected && <span className="selection-check"><Icon name="check" size={15}/></span>}<b>{title}</b><p>{description}</p></button>;
 }
 
-// ─── Screen 07: User Dashboard ────────────────────────────────────────────────
+function Register({ role, navigate, setConfirmRole }: { role: Role; navigate: (s: Screen) => void; setConfirmRole: (r: Role) => void }) {
+  const [form, setForm] = useState(initialForm);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const update = (key: string, value: string) => { setForm({ ...form, [key]: value }); setErrors({ ...errors, [key]: "" }); };
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const next: Record<string, string> = {};
+    const required = role === "staff" ? Object.keys(initialForm) : Object.keys(initialForm).filter((k) => k !== "academy");
+    required.forEach((key) => { if (!form[key as keyof typeof form].trim()) next[key] = "Este campo es obligatorio."; });
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = "Utiliza un correo electrónico válido.";
+    if (form.email.toLowerCase() === "registrado@correo.com") next.email = "Este correo electrónico ya está registrado. Utiliza otro correo.";
+    if (form.username.toLowerCase() === "estudiante") next.username = "Este nombre de usuario ya está registrado. Elige otro.";
+    if (form.password && (form.password.length < 8 || !/[^\w\s]/.test(form.password))) next.password = "La contraseña debe tener mínimo 8 caracteres y al menos un símbolo.";
+    setErrors(next);
+    if (!Object.keys(next).length) {
+      setSubmitting(true);
+      try {
+        await register({
+          nombre: form.name,
+          email: form.email,
+          username: form.username,
+          telefono: form.phone,
+          password: form.password,
+          tipoUsuario: role === "staff" ? "PROVEEDOR" : "CLIENTE",
+          nombreNegocio: form.academy,
+        });
+        setConfirmRole(role);
+        navigate(role === "staff" ? "language" : "confirmation");
+      } catch (requestError) {
+        setErrors({ form: requestError instanceof Error ? requestError.message : "No fue posible crear la cuenta." });
+      } finally {
+        setSubmitting(false);
+      }
+    }
+  }
+  const student = role === "student";
+  return <AuthLayout step={student ? "Paso 2 de 2" : "Paso 2 de 3"}><div className="auth-form register-form"><span className="mobile-brand"><Brand/></span><div className="form-heading"><span className="eyebrow">{student ? "Cuenta de estudiante" : "Cuenta de academia"}</span><h1>{student ? "Crea tu cuenta de estudiante" : "Registra tu cuenta de academia"}</h1><p>{student ? "Ingresa tus datos para comenzar a reservar clases." : "Completa tus datos para gestionar las clases y reservas."}</p></div>{Object.keys(errors).length > 2 && <Notice kind="error">Completa todos los campos obligatorios para continuar.</Notice>}<form onSubmit={submit}><div className="form-grid"><Field label="Nombre completo" name="name" value={form.name} onChange={(v) => update("name", v)} placeholder="Ej. Lucía Martínez" error={errors.name}/><Field label="Correo electrónico" name="email" type="email" value={form.email} onChange={(v) => update("email", v)} placeholder="nombre@correo.com" helper="Utiliza un correo electrónico válido." error={errors.email}/><Field label="Nombre de usuario" name="username" value={form.username} onChange={(v) => update("username", v)} placeholder="Elige un usuario" helper="El nombre de usuario debe ser único." error={errors.username}/><Field label="Número telefónico" name="phone" type="tel" value={form.phone} onChange={(v) => update("phone", v)} placeholder="+34 600 000 000" error={errors.phone}/>{!student && <Field label="Nombre de la academia" name="academy" value={form.academy} onChange={(v) => update("academy", v)} placeholder="Ej. Centro de Idiomas Ágora" error={errors.academy}/>}<Field label="Contraseña" name="password" type="password" value={form.password} onChange={(v) => update("password", v)} placeholder="Crea una contraseña segura" helper="Mínimo 8 caracteres y al menos un símbolo." error={errors.password}/></div><div className="form-actions"><Button variant="secondary" onClick={() => navigate("account-type")}>Volver</Button><Button type="submit" icon="arrow">{student ? "Crear cuenta" : "Continuar"}</Button></div></form><p className="required-note">* Campos obligatorios</p></div></AuthLayout>;
+}
 
-const SERVICES_CARDS = [
-  { name: "Clínica Central", cat: "Clínica", rating: 4.8, reviews: 124, time: "L-V 8am-6pm", img: "photo-1519494026892-80bbd2d6fd0d" },
-  { name: "Salón Bella Vista", cat: "Belleza", rating: 4.9, reviews: 87, time: "Mar-Dom 9am-7pm", img: "photo-1560066984-138dadb4c035" },
-  { name: "FitCenter Plus", cat: "Deportivo", rating: 4.7, reviews: 203, time: "L-D 6am-10pm", img: "photo-1534438327276-14e5300c3a48" },
+function Language({ navigate }: { navigate: (s: Screen) => void }) {
+  const [selected, setSelected] = useState("");
+  const [error, setError] = useState(false);
+  const languages = ["Inglés", "Francés", "Alemán", "Italiano", "Portugués", "Otro idioma"];
+  return <AuthLayout step="Paso 3 de 3"><div className="auth-form wide"><span className="mobile-brand"><Brand/></span><div className="form-heading"><span className="eyebrow">Configura tu academia</span><h1>¿Qué tipo de clase ofreces?</h1><p>Selecciona el idioma principal de las clases de tu academia.</p></div><div className="language-grid">{languages.map((language) => <SelectionCard key={language} icon="globe" title={language} description={language === "Otro idioma" ? "Configúralo más adelante" : `Clases y cursos de ${language.toLowerCase()}`} selected={selected === language} onClick={() => { setSelected(language); setError(false); }}/>)}</div>{error && <Notice kind="error">Selecciona un idioma para continuar.</Notice>}<div className="form-actions"><Button variant="secondary" onClick={() => navigate("staff-register")}>Volver</Button><Button onClick={() => selected ? navigate("confirmation") : setError(true)} icon="arrow">Continuar</Button></div></div></AuthLayout>;
+}
+
+function Confirmation({ role, navigate }: { role: Role; navigate: (s: Screen) => void }) {
+  return <div className="center-page"><div className="success-card"><Brand/><span className="success-icon"><Icon name="check" size={44}/></span><span className="eyebrow">Registro exitoso</span><h1>{role === "student" ? "¡Tu cuenta está lista!" : "¡Registro completado!"}</h1><p>{role === "student" ? "Tu registro se completó correctamente. Ya puedes iniciar sesión y reservar tus próximas clases." : "Tu cuenta y configuración fueron registradas correctamente."}</p><Button onClick={() => navigate("login")} icon="arrow">Ir al inicio de sesión</Button><small>Te damos la bienvenida a Agenda Fácil</small></div></div>;
+}
+
+const availableClass = { id: 1001, reservationId: undefined as number | undefined, name: "Inglés Conversacional B1", language: "Inglés", level: "B1 Intermedio", date: "20 oct 2026", time: "18:00 – 20:00", teacher: "Laura González", academy: "Centro de Idiomas Ágora", seats: 8, total: 20 };
+const staticProviderClasses = [
+  availableClass,
+  { id: 1002, reservationId: undefined as number | undefined, name: "Francés Inicial A1", language: "Francés", level: "A1 Inicial", date: "22 oct 2026", time: "10:00 – 12:00", teacher: "Sophie Martin", academy: "Lingua Nova", seats: 8, total: 16 },
+  { id: 1003, reservationId: undefined as number | undefined, name: "Alemán Intermedio B1", language: "Alemán", level: "B1 Intermedio", date: "24 oct 2026", time: "09:00 – 11:00", teacher: "Felix Müller", academy: "Sprach Haus", seats: 0, total: 20 },
+  { id: 1004, reservationId: undefined as number | undefined, name: "Italiano Conversacional A2", language: "Italiano", level: "A2 Básico", date: "26 oct 2026", time: "17:00 – 19:00", teacher: "Giulia Rossi", academy: "Centro Ágora", seats: 9, total: 14 },
 ];
 
-const UPCOMING = [
-  { service: "Clínica Central", date: "Mié 11 Sep, 10:30 AM", status: "Confirmada", color: "#3DB87A" },
-  { service: "Salón Bella Vista", date: "Vie 13 Sep, 3:00 PM", status: "Pendiente", color: "#F5A623" },
+function StatCard({ icon, label, value, detail, tone = "blue" }: { icon: IconName; label: string; value: string; detail: string; tone?: string }) {
+  return <div className="stat-card"><span className={`stat-icon ${tone}`}><Icon name={icon}/></span><div><p>{label}</p><strong>{value}</strong><small>{detail}</small></div></div>;
+}
+
+function StudentDashboard({ navigate, user, onSelect, booked, bookedCourse }: { navigate: (s: Screen) => void; user: ApiUser; onSelect: (course: typeof availableClass) => void; booked: boolean; bookedCourse: typeof availableClass }) {
+  const [reservations, setReservations] = useState<ReturnType<typeof reservationToCourse>[]>([]);
+  const [availableCourses, setAvailableCourses] = useState<typeof availableClass[]>([]);
+  useEffect(() => {
+    listClientReservations(user.id)
+      .then((items) => setReservations(items.filter((item) => item.estado === "ACTIVA").map(reservationToCourse)))
+      .catch(() => setReservations([]));
+  }, [user.id]);
+  useEffect(() => {
+    listServices()
+      .then((services) => setAvailableCourses(services.length ? services.filter((service) => service.cuposDisponibles > 0).map(serviceToCourse) : staticProviderClasses))
+      .catch(() => setAvailableCourses(staticProviderClasses));
+  }, []);
+  const dashboardReservations = reservations.length ? reservations : booked ? [bookedCourse] : [];
+  const nextReservation = dashboardReservations[0];
+  return <Page role="student" current="student-dashboard" navigate={navigate} user={user}><PageHeading eyebrow="Tu agenda" title={`¡Hola, ${user.nombre}!`} subtitle="Encuentra y reserva tus próximas clases de idiomas." action={<Button onClick={() => navigate("search")} icon="search">Clases disponibles</Button>}/><div className="stats-grid"><StatCard icon="calendar" label="Próximas clases" value={`${dashboardReservations.length}`} detail="Reservas activas"/><StatCard icon="check" label="Reservas activas" value={`${dashboardReservations.length}`} detail="Todas confirmadas" tone="green"/><StatCard icon="book" label="Clases realizadas" value="0" detail="Aún no tienes clases realizadas" tone="purple"/></div><section className="content-section"><div className="section-heading"><div><span className="eyebrow">Tu agenda</span><h2>Próxima clase</h2></div><button className="text-button" onClick={() => navigate("student-classes")}>Ver todas <Icon name="arrow" size={16}/></button></div><div className="featured-class"><div className="date-tile"><b>{nextReservation?.date.split(" ")[0] || "-"}</b><span>{nextReservation?.date.split(" ")[1]?.toUpperCase() || ""}</span></div><div className="class-main"><div className="card-top"><Badge tone={nextReservation ? "green" : "gray"}>{nextReservation ? "Confirmada" : "Sin reservas"}</Badge><span className="language-label"><Icon name="globe" size={15}/> {nextReservation ? `${nextReservation.language} · ${nextReservation.level}` : "Busca una clase disponible"}</span></div><h3>{nextReservation?.name || "Aún no tienes clases agendadas"}</h3><p>{nextReservation ? "Consulta los detalles de tu próxima clase." : "Cuando reserves una clase aparecerá aquí."}</p><div className="meta-row"><span><Icon name="clock" size={17}/>{nextReservation?.time || "-"}</span><span><Icon name="user" size={17}/>{nextReservation?.teacher || "-"}</span><span><Icon name="school" size={17}/>{nextReservation?.academy || "-"}</span></div></div><button className="round-link" aria-label="Ver mis clases" onClick={() => navigate("student-classes")}><Icon name="arrow"/></button></div></section><section className="content-section"><div className="section-heading"><div><span className="eyebrow">Catálogo</span><h2>Clases disponibles</h2></div><button className="text-button" onClick={() => navigate("search")}>Ver catálogo <Icon name="arrow" size={16}/></button></div>{availableCourses.length ? <div className="course-grid">{availableCourses.slice(0, 3).map((course) => <CourseCard key={course.id} course={course} onSelect={() => { onSelect(course); navigate("booking-detail"); }}/>)}</div> : <EmptyState icon="book" title="No hay clases disponibles todavía." text="Cuando un proveedor publique una clase, aparecerá aquí."/>}</section><section className="quick-grid"><button className="quick-card" onClick={() => navigate("search")}><span className="quick-icon"><Icon name="search"/></span><div><b>Clases disponibles</b><p>Explora idiomas, niveles y horarios.</p></div><Icon name="chevron"/></button><button className="quick-card" onClick={() => navigate("history")}><span className="quick-icon mint"><Icon name="history"/></span><div><b>Historial</b><p>Revisa tus clases anteriores.</p></div><Icon name="chevron"/></button></section></Page>;
+}
+
+function CreateServiceForm({ providerId }: { providerId: number }) {
+  const [form, setForm] = useState({ nombre: "", descripcion: "", idioma: "Inglés", nivel: "B1", fechaHora: "", duracion: "120", precio: "0", capacidad: "20" });
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const update = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setMessage("");
+    setError("");
+    if (!form.nombre.trim() || !form.fechaHora || Number(form.capacidad) <= 0 || Number(form.duracion) <= 0) {
+      setError("Completa el nombre, la fecha y hora, la duración y una capacidad mayor que cero.");
+      return;
+    }
+    try {
+      await createService(providerId, {
+        nombre: form.nombre,
+        descripcion: form.descripcion,
+        idioma: form.idioma,
+        nivel: form.nivel,
+        fechaHora: form.fechaHora,
+        duracion: Number(form.duracion),
+        precio: Number(form.precio),
+        capacidad: Number(form.capacidad),
+      });
+      setMessage("Clase publicada correctamente. Ya está disponible para los estudiantes.");
+      setForm((current) => ({ ...current, nombre: "", descripcion: "", fechaHora: "" }));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "No fue posible publicar la clase.");
+    }
+  }
+  return <section className="content-section"><div className="section-heading"><div><span className="eyebrow">Nueva clase</span><h2>Publicar una clase</h2></div></div>{message && <Notice kind="success">{message}</Notice>}{error && <Notice kind="error">{error}</Notice>}<form className="form-grid" onSubmit={submit}><Field label="Nombre de la clase" name="nombre" value={form.nombre} onChange={(value) => update("nombre", value)} placeholder="Ej. Inglés Conversacional B1"/><Field label="Descripción" name="descripcion" value={form.descripcion} onChange={(value) => update("descripcion", value)} placeholder="Describe la clase"/><Field label="Idioma" name="idioma" value={form.idioma} onChange={(value) => update("idioma", value)} placeholder="Inglés"/><Field label="Nivel" name="nivel" value={form.nivel} onChange={(value) => update("nivel", value)} placeholder="B1"/><Field label="Fecha y hora" name="fechaHora" type="datetime-local" value={form.fechaHora} onChange={(value) => update("fechaHora", value)}/><Field label="Duración (minutos)" name="duracion" type="number" value={form.duracion} onChange={(value) => update("duracion", value)}/><Field label="Precio" name="precio" type="number" value={form.precio} onChange={(value) => update("precio", value)}/><Field label="Capacidad" name="capacidad" type="number" value={form.capacidad} onChange={(value) => update("capacidad", value)}/><Button type="submit" icon="check">Publicar clase</Button></form></section>;
+}
+
+function StaffDashboard({ navigate, user }: { navigate: (s: Screen) => void; user: ApiUser }) {
+  return <Page role="staff" current="staff-dashboard" navigate={navigate} user={user}><PageHeading eyebrow="Resumen de hoy" title={`Panel de ${user.nombre}`} subtitle="Gestiona tus clases y consulta las reservas de los estudiantes." action={<Button onClick={() => navigate("staff-classes")} icon="calendar">Ver agenda</Button>}/><CreateServiceForm providerId={user.id}/><div className="stats-grid four"><StatCard icon="calendar" label="Clases próximas" value="8" detail="3 esta semana"/><StatCard icon="users" label="Estudiantes" value="146" detail="+12 este mes" tone="purple"/><StatCard icon="clock" label="Cupos disponibles" value="42" detail="En 8 clases" tone="amber"/><StatCard icon="check" label="Reservas" value="86" detail="Este mes" tone="green"/></div><section className="content-section"><div className="section-heading"><div><span className="eyebrow">Agenda</span><h2>Próximas clases</h2></div><button className="text-button" onClick={() => navigate("staff-classes")}>Ver clases agendadas <Icon name="arrow" size={16}/></button></div><ClassRow/><ClassRow second/></section><section className="academy-callout"><div className="callout-icon"><Icon name="history" size={25}/></div><div><b>Historial de reservaciones</b><p>Consulta el rendimiento y las reservas anteriores de tu academia.</p></div><Button variant="secondary" onClick={() => navigate("history")}>Ver historial</Button></section></Page>;
+}
+
+function ClassRow({ second = false }: { second?: boolean }) {
+  return <div className="class-row"><div className="date-tile small"><b>{second ? "22" : "20"}</b><span>OCT</span></div><div className="class-row-title"><b>{second ? "Francés Inicial A1" : "Inglés Conversacional B1"}</b><span><Icon name="clock" size={15}/>{second ? "10:00 – 12:00" : "18:00 – 20:00"}</span></div><div className="occupancy"><div><span>Ocupación</span><b>{second ? "8 / 16" : "12 / 20"} estudiantes</b></div><div className="progress"><i style={{ width: second ? "50%" : "60%" }}/></div></div><span className="seats">{second ? "8" : "8"} cupos disponibles</span><Badge tone="blue">Programada</Badge></div>;
+}
+
+function Tabs({ active, setActive, options }: { active: string; setActive: (v: string) => void; options: string[] }) {
+  return <div className="tabs">{options.map((option) => <button key={option} className={active === option ? "active" : ""} onClick={() => setActive(option)}>{option}</button>)}</div>;
+}
+
+function StudentClasses({ navigate, booked, cancelledCourses, bookedCourse, clientId, onCancel, user }: { navigate: (s: Screen) => void; booked: boolean; cancelledCourses: typeof availableClass[]; bookedCourse: typeof availableClass; clientId: number; onCancel: (course: typeof availableClass) => void; user?: ApiUser | null }) {
+  const [tab, setTab] = useState("Próximas");
+  const [confirming, setConfirming] = useState<typeof availableClass | null>(null);
+  const [remoteReservations, setRemoteReservations] = useState<typeof availableClass[]>([]);
+  useEffect(() => {
+    listClientReservations(clientId)
+      .then((reservations) => setRemoteReservations(reservations.filter((item) => item.estado === "ACTIVA").map(reservationToCourse)))
+      .catch(() => setRemoteReservations([]));
+  }, [clientId]);
+    const upcomingReservations = remoteReservations.length ? remoteReservations : booked ? [bookedCourse] : [];
+  const activeReservations = upcomingReservations.filter((course) => !cancelledCourses.some((cancelled) => cancelled.name === course.name));
+  return <Page role="student" current="student-classes" navigate={navigate} user={user}><PageHeading title="Mis clases agendadas" subtitle="Consulta tus próximas clases y el estado de tus reservas." action={<Button onClick={() => navigate("search")} icon="search">Buscar clases</Button>}/><Tabs active={tab} setActive={setTab} options={["Próximas", "Realizadas"]}/><div className="class-list">{tab === "Próximas" ? (activeReservations.length ? <>{activeReservations.map((course) => <ReservationCard key={course.name} featured={booked && course.name === bookedCourse.name} course={course} onCancel={() => setConfirming(course)}/>) }</> : <EmptyState icon="calendar" title="No tienes clases agendadas." text="Cuando reserves una clase, aparecerá aquí." action={<Button variant="secondary" onClick={() => navigate("search")}>Buscar clases</Button>}/>) : <><ReservationCard completed/><ReservationCard completed second/></>}</div>{confirming && <CancellationModal course={confirming} onKeep={() => setConfirming(null)} onConfirm={() => { const course = confirming; setConfirming(null); onCancel(course); }}/>}</Page>;
+}
+
+function ReservationCard({ featured = false, pending = false, completed = false, second = false, cancelled = false, course, onCancel }: { featured?: boolean; pending?: boolean; completed?: boolean; second?: boolean; cancelled?: boolean; course?: typeof availableClass; onCancel?: () => void }) {
+  const name = course ? course.name : second ? "Pronunciación Francesa A2" : completed ? "Inglés para Viajes A2" : pending ? "Taller de Escritura B2" : "Francés Inicial A1";
+  const status = cancelled ? "Cancelada" : completed ? "Completada" : pending ? "Pendiente" : "Confirmada";
+  return <article className={`reservation-card ${featured ? "new" : ""} ${cancelled ? "cancelled" : ""}`}><div className="course-icon"><Icon name={cancelled ? "close" : completed ? "check" : "book"} size={23}/></div><div className="reservation-title">{featured && !cancelled && <span className="new-label">NUEVA RESERVA</span>}<h3>{name}</h3><p>{course ? course.language : second || pending ? "Francés" : "Inglés"} · {course ? course.level : second ? "A2" : pending ? "B2 Avanzado" : "A1 Inicial"}</p></div><div className="reservation-meta"><span><small>FECHAS</small><b>{course ? course.date : completed ? "10 ago – 10 sep 2026" : "22 oct – 17 dic 2026"}</b></span><span><small>HORARIO</small><b>{course ? course.time : pending ? "16:00 – 18:00" : "18:00 – 20:00"}</b></span><span><small>PROFESOR</small><b>{course ? course.teacher : second ? "Sophie Martin" : "Laura González"}</b></span></div><div className="reservation-actions"><Badge tone={cancelled ? "red" : completed ? "gray" : pending ? "amber" : "green"}>{status}</Badge>{course && !cancelled && !completed && <button className="cancel-link" onClick={onCancel}>Cancelar reserva</button>}</div></article>;
+}
+
+function CancellationModal({ course, onKeep, onConfirm }: { course: typeof availableClass; onKeep: () => void; onConfirm: () => void }) {
+  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onKeep(); }}><div className="confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="cancel-title"><button className="modal-close" aria-label="Cerrar" onClick={onKeep}><Icon name="close"/></button><span className="modal-alert"><Icon name="alert" size={27}/></span><h2 id="cancel-title">Cancelar reserva</h2><p>¿Estás seguro de que deseas cancelar esta reserva?</p><div className="cancel-details"><div><small>CURSO</small><b>{course.name}</b><span>{course.language} · {course.level}</span></div><div className="cancel-detail-grid"><span><small>FECHA</small><b>{course.date}</b></span><span><small>HORARIO</small><b>{course.time}</b></span><span><small>ESTADO ACTUAL</small><Badge tone="green">Confirmada</Badge></span><span><small>DISPONIBILIDAD</small><b>{course.seats} cupos disponibles</b></span></div></div><Notice kind="info">Al cancelar, tu cupo quedará disponible para otro estudiante.</Notice><div className="modal-actions"><Button variant="secondary" onClick={onKeep}>Mantener reserva</Button><Button variant="danger" onClick={onConfirm}>Confirmar cancelación</Button></div></div></div>;
+}
+
+const academyClasses = [
+  { name: "Inglés Conversacional B1", level: "Inglés · B1", date: "20 oct 2026", time: "18:00 – 20:00", current: 12, total: 20, status: "Programada" },
+  { name: "Francés Inicial A1", level: "Francés · A1", date: "22 oct 2026", time: "10:00 – 12:00", current: 8, total: 16, status: "Programada" },
+  { name: "Alemán Intermedio B1", level: "Alemán · B1", date: "24 oct 2026", time: "09:00 – 11:00", current: 20, total: 20, status: "Programada" },
+  { name: "Italiano Conversacional A2", level: "Italiano · A2", date: "26 oct 2026", time: "17:00 – 19:00", current: 5, total: 14, status: "Programada" },
+  { name: "Inglés para Viajes A2", level: "Inglés · A2", date: "08 oct 2026", time: "16:00 – 18:00", current: 14, total: 16, status: "Finalizada" },
+  { name: "Francés Conversacional B1", level: "Francés · B1", date: "05 oct 2026", time: "18:00 – 20:00", current: 12, total: 14, status: "Finalizada" },
 ];
 
-function Screen07PanelUsuario({ onNavigate }: { onNavigate: (s: Screen) => void }) {
-  const [search, setSearch] = useState("");
-
-  return (
-    <div className="min-h-screen bg-[#F7F9FC]">
-      <AppHeader onNavigate={onNavigate} />
-
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        {/* Welcome */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#1A2B4A]">Bienvenido a Agenda Fácil</h1>
-          <p className="text-[#6B7A93] mt-1">Encuentra y reserva servicios de forma rápida y sencilla.</p>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {[
-            { label: "Citas activas", value: "2", color: "#5B8DEF", bg: "#EBF1FD" },
-            { label: "Historial", value: "12", color: "#65C7A5", bg: "#E8F7F2" },
-            { label: "Proveedores fav.", value: "5", color: "#F5A623", bg: "#FEF8EC" },
-            { label: "Este mes", value: "3", color: "#9B59B6", bg: "#F5EEF8" },
-          ].map((s) => (
-            <div key={s.label} className="bg-white rounded-xl border border-[#DDE4EF] p-4 flex flex-col gap-1 shadow-sm">
-              <span className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</span>
-              <span className="text-xs text-[#6B7A93] font-medium">{s.label}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Search + services */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            {/* Search */}
-            <div className="bg-white rounded-2xl border border-[#DDE4EF] p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-[#1A2B4A] mb-4">Buscar servicios</h2>
-              <div className="relative mb-4">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7A93]">
-                  <IconSearch />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Buscar clínicas, salones, gimnasios..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-[#DDE4EF] text-sm text-[#1A2B4A] placeholder:text-[#9BA8BB] outline-none focus:ring-2 focus:ring-[#5B8DEF]/30 focus:border-[#5B8DEF]"
-                />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {["Clínica", "Belleza", "Deportivo", "Consultorio"].map((c) => (
-                  <button key={c} className="text-xs font-medium px-3 py-1.5 rounded-full bg-[#EBF1FD] text-[#5B8DEF] hover:bg-[#5B8DEF] hover:text-white transition-all">
-                    {c}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Service cards */}
-            <div>
-              <h2 className="text-lg font-bold text-[#1A2B4A] mb-4">Servicios disponibles</h2>
-              <div className="flex flex-col gap-4">
-                {SERVICES_CARDS.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.cat.toLowerCase().includes(search.toLowerCase())).map((s) => (
-                  <div key={s.name} className="bg-white rounded-2xl border border-[#DDE4EF] overflow-hidden flex flex-col sm:flex-row shadow-sm hover:shadow-md transition-shadow group">
-                    <div className="sm:w-32 h-32 sm:h-auto bg-[#DDE4EF] flex-shrink-0 overflow-hidden">
-                      <img
-                        src={`https://images.unsplash.com/${s.img}?w=200&h=150&fit=crop&auto=format`}
-                        alt={s.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                    <div className="flex-1 p-4 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[#EBF1FD] text-[#5B8DEF]">{s.cat}</span>
-                        </div>
-                        <h3 className="font-bold text-[#1A2B4A] text-sm">{s.name}</h3>
-                        <div className="flex items-center gap-1 mt-1">
-                          <IconStar className="w-3.5 h-3.5 text-[#F5A623]" />
-                          <span className="text-xs font-medium text-[#1A2B4A]">{s.rating}</span>
-                          <span className="text-xs text-[#6B7A93]">({s.reviews} reseñas)</span>
-                        </div>
-                        <p className="text-xs text-[#6B7A93] mt-1">{s.time}</p>
-                      </div>
-                      <button className="mt-3 self-start text-xs font-semibold bg-[#5B8DEF] hover:bg-[#4a7de0] text-white px-4 py-1.5 rounded-lg transition-colors">
-                        Reservar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="flex flex-col gap-6">
-            {/* Upcoming */}
-            <div className="bg-white rounded-2xl border border-[#DDE4EF] p-5 shadow-sm">
-              <h2 className="text-base font-bold text-[#1A2B4A] mb-4">Próximas citas</h2>
-              {UPCOMING.map((u) => (
-                <div key={u.service} className="flex gap-3 mb-3 last:mb-0">
-                  <div className="w-1 rounded-full flex-shrink-0" style={{ backgroundColor: u.color }} />
-                  <div>
-                    <p className="text-sm font-medium text-[#1A2B4A]">{u.service}</p>
-                    <p className="text-xs text-[#6B7A93]">{u.date}</p>
-                    <span className="inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: `${u.color}20`, color: u.color }}>
-                      {u.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* History */}
-            <div className="bg-white rounded-2xl border border-[#DDE4EF] p-5 shadow-sm">
-              <h2 className="text-base font-bold text-[#1A2B4A] mb-4">Historial de reservaciones</h2>
-              {[
-                { service: "FitCenter Plus", date: "3 Sep, 2026", status: "Completada" },
-                { service: "Clínica Central", date: "28 Ago, 2026", status: "Completada" },
-                { service: "Salón Bella Vista", date: "20 Ago, 2026", status: "Cancelada" },
-              ].map((h) => (
-                <div key={h.date} className="flex items-center justify-between py-2 border-b border-[#F0F3F8] last:border-0">
-                  <div>
-                    <p className="text-xs font-medium text-[#1A2B4A]">{h.service}</p>
-                    <p className="text-xs text-[#6B7A93]">{h.date}</p>
-                  </div>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${h.status === "Completada" ? "bg-[#EDFAF3] text-[#3DB87A]" : "bg-[#FEF0F0] text-[#E85555]"}`}>
-                    {h.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
+function StaffClasses({ navigate, providerId, user }: { navigate: (s: Screen) => void; providerId: number; user?: ApiUser | null }) {
+  const [view, setView] = useState("Todas");
+  const [month, setMonth] = useState("Octubre 2026");
+  const [remoteClasses, setRemoteClasses] = useState<typeof academyClasses>([]);
+  useEffect(() => {
+    listProviderReservations(providerId).then((reservations) => {
+      const grouped = new Map<number, typeof academyClasses[number]>();
+      reservations.filter((item) => item.estado === "ACTIVA").forEach((reservation) => {
+        const course = reservationToCourse(reservation);
+        const current = grouped.get(course.id);
+        grouped.set(course.id, current ? { ...current, current: current.current + 1 } : {
+          name: course.name,
+          level: `${course.language} · ${course.level}`,
+          date: course.date,
+          time: course.time,
+          current: 1,
+          total: Math.max(1, course.total),
+          status: "Programada",
+        });
+      });
+      setRemoteClasses(Array.from(grouped.values()));
+    }).catch(() => setRemoteClasses([]));
+  }, [providerId]);
+  const classesToShow = remoteClasses.length ? remoteClasses : academyClasses;
+  const monthKey = month.startsWith("Octubre") ? "oct" : "nov";
+  const visibleClasses = (view === "Todas" ? classesToShow : classesToShow.filter((item) => item.status === view.slice(0, -1))).filter((item) => item.date.includes(` ${monthKey} `));
+  return <Page role="staff" current="staff-classes" navigate={navigate} user={user}><PageHeading title="Clases agendadas" subtitle="Consulta las clases programadas y las que ya finalizaron."/><div className="toolbar"><Tabs active={view} setActive={setView} options={["Todas", "Programadas", "Finalizadas"]}/><label className="period"><Icon name="calendar" size={17}/><select value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Mes" style={{ border: "none", background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", outline: "none" }}><option>Octubre 2026</option><option>Noviembre 2026</option></select></label></div>{visibleClasses.length ? <><div className="schedule-table"><div className="table-head"><span>Curso / clase</span><span>Fecha y hora</span><span>Ocupación</span><span>Disponibilidad</span><span>Estado</span></div>{visibleClasses.map((item) => <ScheduleItem key={`${item.name}-${item.date}`} {...item}/>)}</div><p className="results-note">Mostrando {visibleClasses.length} {visibleClasses.length === 1 ? "clase" : "clases"} en esta vista.</p></> : <EmptyState icon="calendar" title="No existen clases agendadas." text="No hay clases con reservas en esta vista. Prueba con otro periodo o estado."/>}</Page>;
 }
 
-// ─── Screen 08: Provider Dashboard ───────────────────────────────────────────
-
-function Screen08PanelProveedor({ onNavigate }: { onNavigate: (s: Screen) => void }) {
-  return (
-    <div className="min-h-screen bg-[#F7F9FC]">
-      <AppHeader onNavigate={onNavigate} isProvider />
-
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-[#1A2B4A]">Panel del proveedor</h1>
-            <p className="text-[#6B7A93] mt-1">Gestiona tus servicios, reservas y disponibilidad.</p>
-          </div>
-          <button className="self-start sm:self-auto bg-[#65C7A5] hover:bg-[#52b894] text-white font-semibold text-sm px-5 py-2.5 rounded-xl shadow-sm transition-colors">
-            + Nuevo servicio
-          </button>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {[
-            { label: "Reservas hoy", value: "8", color: "#5B8DEF", bg: "#EBF1FD" },
-            { label: "Este mes", value: "47", color: "#65C7A5", bg: "#E8F7F2" },
-            { label: "Servicios activos", value: "3", color: "#F5A623", bg: "#FEF8EC" },
-            { label: "Valoración", value: "4.8★", color: "#9B59B6", bg: "#F5EEF8" },
-          ].map((s) => (
-            <div key={s.label} className="bg-white rounded-xl border border-[#DDE4EF] p-4 shadow-sm">
-              <span className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</span>
-              <p className="text-xs text-[#6B7A93] font-medium mt-1">{s.label}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            {/* Mis servicios */}
-            <div className="bg-white rounded-2xl border border-[#DDE4EF] p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-[#1A2B4A] mb-4">Mis servicios</h2>
-              <div className="flex flex-col gap-4">
-                {[
-                  { name: "Consulta General", cat: "Clínica", avail: "Disponible", reservas: 12, img: "photo-1519494026892-80bbd2d6fd0d" },
-                  { name: "Examen de Rutina", cat: "Clínica", avail: "Ocupado", reservas: 8, img: "photo-1581595220892-b0739db3ba8c" },
-                  { name: "Limpieza Dental", cat: "Clínica", avail: "Disponible", reservas: 15, img: "photo-1606811971618-4486d14f3f99" },
-                ].map((svc) => (
-                  <div key={svc.name} className="flex items-center gap-4 p-4 rounded-xl bg-[#F7F9FC] border border-[#DDE4EF] hover:border-[#65C7A5]/50 transition-colors group">
-                    <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-[#DDE4EF]">
-                      <img
-                        src={`https://images.unsplash.com/${svc.img}?w=100&h=100&fit=crop&auto=format`}
-                        alt={svc.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-bold text-[#1A2B4A]">{svc.name}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-[#EBF1FD] text-[#5B8DEF] font-medium">{svc.cat}</span>
-                      </div>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${svc.avail === "Disponible" ? "bg-[#EDFAF3] text-[#3DB87A]" : "bg-[#FEF8EC] text-[#F5A623]"}`}>
-                          {svc.avail}
-                        </span>
-                        <span className="text-xs text-[#6B7A93]">{svc.reservas} reservas</span>
-                      </div>
-                    </div>
-                    <button className="text-xs font-semibold text-[#5B8DEF] hover:text-[#4a7de0] opacity-0 group-hover:opacity-100 transition-opacity">
-                      Editar
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Disponibilidad */}
-            <div className="bg-white rounded-2xl border border-[#DDE4EF] p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-[#1A2B4A] mb-4">Disponibilidad — Semana actual</h2>
-              <div className="grid grid-cols-7 gap-1">
-                {["L", "M", "Mi", "J", "V", "S", "D"].map((d, i) => (
-                  <div key={d} className="text-center">
-                    <p className="text-xs text-[#6B7A93] font-medium mb-1">{d}</p>
-                    <div className={`h-10 rounded-lg flex items-center justify-center text-xs font-semibold cursor-pointer transition-colors ${
-                      [0, 1, 2, 3, 4].includes(i)
-                        ? "bg-[#EDFAF3] text-[#3DB87A] hover:bg-[#65C7A5] hover:text-white"
-                        : "bg-[#F0F3F8] text-[#9BA8BB]"
-                    }`}>
-                      {[0,1,2,3,4].includes(i) ? "✓" : "–"}
-                    </div>
-                    <p className="text-xs text-[#9BA8BB] mt-1">{7 + i}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="flex flex-col gap-6">
-            <div className="bg-white rounded-2xl border border-[#DDE4EF] p-5 shadow-sm">
-              <h2 className="text-base font-bold text-[#1A2B4A] mb-4">Próximas reservas</h2>
-              {[
-                { patient: "Carlos Méndez", service: "Consulta General", time: "10:30 AM", status: "Confirmada" },
-                { patient: "Ana Ruiz", service: "Limpieza Dental", time: "11:00 AM", status: "Confirmada" },
-                { patient: "Luis Torres", service: "Examen de Rutina", time: "2:00 PM", status: "Pendiente" },
-                { patient: "María López", service: "Consulta General", time: "3:30 PM", status: "Confirmada" },
-              ].map((r) => (
-                <div key={`${r.patient}-${r.time}`} className="flex items-start gap-3 py-3 border-b border-[#F0F3F8] last:border-0">
-                  <div className="w-7 h-7 rounded-full bg-[#EBF1FD] flex items-center justify-center text-[#5B8DEF] text-xs font-bold flex-shrink-0">
-                    {r.patient[0]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-[#1A2B4A]">{r.patient}</p>
-                    <p className="text-xs text-[#6B7A93]">{r.service}</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-xs text-[#5B8DEF] font-medium">{r.time}</span>
-                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${r.status === "Confirmada" ? "bg-[#EDFAF3] text-[#3DB87A]" : "bg-[#FEF8EC] text-[#F5A623]"}`}>
-                        {r.status}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Summary */}
-            <div className="bg-gradient-to-br from-[#5B8DEF] to-[#65C7A5] rounded-2xl p-5 text-white shadow-md">
-              <h2 className="font-bold mb-3">Resumen de reservas</h2>
-              <div className="flex flex-col gap-2">
-                {[
-                  { label: "Completadas", val: "34", pct: 72 },
-                  { label: "Pendientes", val: "8", pct: 17 },
-                  { label: "Canceladas", val: "5", pct: 11 },
-                ].map((r) => (
-                  <div key={r.label}>
-                    <div className="flex justify-between text-xs mb-1 text-white/90">
-                      <span>{r.label}</span>
-                      <span className="font-semibold">{r.val}</span>
-                    </div>
-                    <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-                      <div className="h-full bg-white/70 rounded-full" style={{ width: `${r.pct}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
+function ScheduleItem({ name, level, date, time, current, total, status = "Programada" }: { name: string; level: string; date: string; time: string; current: number; total: number; status?: string }) {
+  const full = current === total;
+  const percent = `${(current / total) * 100}%`;
+  const completed = status === "Finalizada";
+  return <div className="schedule-item"><div className="course-cell"><span className="mini-course"><Icon name="book"/></span><div><b>{name}</b><small>{level}</small></div></div><div className="date-cell"><b>{date}</b><small>{time}</small></div><div className="occupancy"><div><b>{current} / {total}</b><small> estudiantes</small></div><div className="progress"><i className={full ? "full" : ""} style={{ width: percent }}/></div></div><div className={full ? "availability none" : "availability"}><b>{completed ? "—" : total - current}</b><small>{completed ? "Clase cerrada" : full ? "Sin cupos disponibles" : "cupos disponibles"}</small></div><Badge tone={completed ? "gray" : full ? "amber" : "blue"}>{completed ? "Finalizada" : full ? "Llena" : "Programada"}</Badge></div>;
 }
 
-// ─── Root App ─────────────────────────────────────────────────────────────────
+function StaffAvailability({ navigate, user }: { navigate: (s: Screen) => void; user?: ApiUser | null }) {
+  const upcoming = academyClasses.filter((item) => item.status === "Programada");
+  const [capacities, setCapacities] = useState<Record<string, number>>(() => Object.fromEntries(upcoming.map((item) => [item.name, item.total])));
+  const [saved, setSaved] = useState("");
+  function changeCapacity(name: string, current: number, amount: number) {
+    setSaved("");
+    setCapacities((values) => ({ ...values, [name]: Math.max(current, Math.min(40, values[name] + amount)) }));
+  }
+  return <Page role="staff" current="staff-availability" navigate={navigate} user={user}><PageHeading title="Disponibilidad y cupos" subtitle="Configura la capacidad de tus próximas clases y consulta los cupos restantes."/><div className="availability-summary"><StatCard icon="clock" label="Cupos disponibles" value="42" detail="En clases programadas" tone="amber"/><StatCard icon="users" label="Capacidad total" value="70" detail="En 4 clases activas"/><StatCard icon="alert" label="Clases completas" value="1" detail="Requiere seguimiento" tone="purple"/></div>{saved && <Notice kind="success">La capacidad de {saved} se actualizó correctamente.</Notice>}<div className="availability-list">{upcoming.map((item) => {
+    const capacity = capacities[item.name];
+    const remaining = capacity - item.current;
+    return <article className="availability-card" key={item.name}><div className="availability-course"><span className="mini-course"><Icon name="book"/></span><div><h3>{item.name}</h3><p>{item.level} · {item.date} · {item.time}</p></div></div><div className="availability-metric"><small>ESTUDIANTES REGISTRADOS</small><b>{item.current}</b></div><div className="availability-metric"><small>CUPOS DISPONIBLES</small><b className={remaining === 0 ? "no-seats-text" : ""}>{remaining}</b></div><div className="capacity-control"><small>CAPACIDAD TOTAL</small><div><button aria-label={`Reducir capacidad de ${item.name}`} disabled={capacity <= item.current} onClick={() => changeCapacity(item.name, item.current, -1)}>−</button><b>{capacity}</b><button aria-label={`Aumentar capacidad de ${item.name}`} onClick={() => changeCapacity(item.name, item.current, 1)}>+</button></div></div><Button variant="secondary" onClick={() => setSaved(item.name)}>Guardar</Button></article>;
+  })}</div></Page>;
+}
+
+function History({ navigate, role, clientId, user }: { navigate: (s: Screen) => void; role: Role; clientId?: number; user?: ApiUser | null }) {
+  const [filter, setFilter] = useState("Todas");
+  const [query, setQuery] = useState("");
+  const [remoteEntries, setRemoteEntries] = useState<[string, string, string, string, string][]>([]);
+  useEffect(() => {
+    if (role !== "student" || !clientId) {
+      setRemoteEntries([]);
+      return;
+    }
+    listClientReservations(clientId).then((reservations) => {
+      setRemoteEntries(reservations.map((reservation) => {
+        const course = reservationToCourse(reservation);
+        const status = reservation.estado === "CANCELADA" ? "Cancelada" : "Pendiente";
+        return [course.name, `${course.language} · ${course.level}`, course.date, course.time, status];
+      }));
+    }).catch(() => setRemoteEntries([]));
+  }, [role, clientId]);
+  const entries = remoteEntries;
+  const shown = entries.filter((e) => (filter === "Todas" || e[4].startsWith(filter.slice(0, -1))) && e[0].toLowerCase().includes(query.toLowerCase()));
+  return <Page role={role} current="history" navigate={navigate} user={user}><PageHeading title="Historial de reservaciones" subtitle="Consulta las clases y reservas realizadas anteriormente."/><div className="history-toolbar"><div className="search-box"><Icon name="search" size={18}/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar en historial…"/></div><div className="filter-pills"><Icon name="filter" size={17}/>{["Todas", "Completadas", "Canceladas", "Pendientes"].map((f) => <button key={f} className={filter === f ? "active" : ""} onClick={() => setFilter(f)}>{f}</button>)}</div></div>{shown.length ? <div className="history-list">{shown.map((entry, index) => <div className="history-item" key={`${entry[0]}-${entry[2]}-${entry[4]}-${index}`}><span className="history-icon"><Icon name={entry[4] === "Completada" ? "check" : entry[4] === "Cancelada" ? "close" : "clock"}/></span><div className="history-name"><b>{entry[0]}</b><small>{entry[1]}</small></div><div><small>FECHA DE CLASE</small><b>{entry[2]}</b></div><div><small>HORARIO</small><b>{entry[3]}</b></div><div><small>{role === "staff" ? "ESTUDIANTES" : "FECHA DE RESERVA"}</small><b>{role === "staff" ? "12 registrados" : "28 ago 2026"}</b></div><Badge tone={entry[4] === "Completada" ? "gray" : entry[4] === "Cancelada" ? "red" : "amber"}>{entry[4]}</Badge></div>)}</div> : <EmptyState icon="history" title="No tienes reservaciones en el historial." text="Las reservaciones realizadas aparecerán aquí."/>}</Page>;
+}
+
+const classes = [
+  availableClass,
+  { name: "Francés Inicial A1", language: "Francés", level: "A1 Inicial", date: "22 oct 2026", time: "10:00 – 12:00", teacher: "Sophie Martin", academy: "Lingua Nova", seats: 5, total: 16 },
+  { name: "Alemán para Viajes A2", language: "Alemán", level: "A2 Básico", date: "24 oct 2026", time: "09:00 – 11:00", teacher: "Felix Müller", academy: "Sprach Haus", seats: 0, total: 14 },
+  { name: "Italiano Conversacional A2", language: "Italiano", level: "A2 Básico", date: "26 oct 2026", time: "17:00 – 19:00", teacher: "Giulia Rossi", academy: "Centro Ágora", seats: 9, total: 14 },
+];
+
+function SearchClasses({ navigate, onSelect, cancelledCourses }: { navigate: (s: Screen) => void; onSelect: (course: typeof availableClass) => void; cancelledCourses: typeof availableClass[] }) {
+  const [query, setQuery] = useState("");
+  const [language, setLanguage] = useState("Todos");
+  const [level, setLevel] = useState("Todos");
+  const [date, setDate] = useState("Todas");
+  const [schedule, setSchedule] = useState("Todos");
+  const [showFull, setShowFull] = useState(false);
+  const [listedClasses, setListedClasses] = useState<typeof availableClass[]>([]);
+  useEffect(() => {
+    listServices().then((services) => setListedClasses(services.length ? services.map(serviceToCourse) : staticProviderClasses)).catch(() => setListedClasses(staticProviderClasses));
+  }, []);
+  const visibleClasses = listedClasses.map((course) => cancelledCourses.some((cancelled) => cancelled.name === course.name) ? { ...course, seats: course.seats + 1 } : course);
+  const filtered = visibleClasses.filter((course) => {
+    const startHour = Number(course.time.slice(0, 2));
+    return (showFull || course.seats > 0)
+      && (language === "Todos" || course.language === language)
+      && (level === "Todos" || course.level.startsWith(level))
+      && (date === "Todas" || course.date === date)
+      && (schedule === "Todos" || (schedule === "Mañana" ? startHour < 12 : startHour >= 12))
+      && `${course.name} ${course.language}`.toLowerCase().includes(query.toLowerCase());
+  });
+  const hasFilters = query || language !== "Todos" || level !== "Todos" || date !== "Todas" || schedule !== "Todos";
+  function clearFilters() {
+    setQuery(""); setLanguage("Todos"); setLevel("Todos"); setDate("Todas"); setSchedule("Todos"); setShowFull(false);
+  }
+  const latestCancellation = cancelledCourses.at(-1);
+  return <Page role="student" current="search" navigate={navigate}><PageHeading title="Clases disponibles" subtitle="Encuentra una clase que se ajuste a tus necesidades y horario."/><div className="search-panel filters-panel"><div className="search-box large"><Icon name="search"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar una clase…"/></div><div className="select-filters"><label><span>Idioma</span><select value={language} onChange={(e) => setLanguage(e.target.value)}><option>Todos</option><option>Inglés</option><option>Francés</option><option>Alemán</option><option>Italiano</option></select></label><label><span>Nivel</span><select value={level} onChange={(e) => setLevel(e.target.value)}><option>Todos</option><option>A1</option><option>A2</option><option>B1</option></select></label><label><span>Fecha</span><select value={date} onChange={(e) => setDate(e.target.value)}><option>Todas</option><option>20 oct 2026</option><option>22 oct 2026</option><option>24 oct 2026</option><option>26 oct 2026</option></select></label><label><span>Horario</span><select value={schedule} onChange={(e) => setSchedule(e.target.value)}><option>Todos</option><option>Mañana</option><option>Tarde</option></select></label></div><div className="filter-footer"><button className={`full-toggle ${showFull ? "active" : ""}`} onClick={() => setShowFull(!showFull)}><span className="toggle-track"><i/></span>Mostrar clases completas</button>{hasFilters && <button className="clear-filters" onClick={clearFilters}>Limpiar filtros</button>}</div></div>{latestCancellation && <Notice kind="success">La cancelación liberó un cupo. {latestCancellation.name} ahora tiene {latestCancellation.seats + 1} cupos disponibles.</Notice>}<div className="results-head"><p><b>{filtered.length} clases</b> {showFull ? "encontradas" : "con cupos disponibles"}</p><span>Ordenar: <b>Más próximas</b></span></div>{filtered.length ? <div className="course-grid">{filtered.map((course) => <CourseCard key={course.name} course={course} onSelect={() => { onSelect(course); navigate(course.seats ? "booking-detail" : "no-seats"); }}/>)}</div> : <EmptyState icon="search" title={hasFilters ? "No encontramos clases disponibles con estos criterios." : "No hay clases disponibles."} text={hasFilters ? "Prueba con otros filtros para encontrar una clase." : "En este momento no existen clases con cupos disponibles. Intenta consultar nuevamente más tarde."} action={hasFilters ? <Button variant="secondary" onClick={clearFilters}>Limpiar filtros</Button> : undefined}/>}</Page>;
+}
+
+function CourseCard({ course, onSelect }: { course: typeof availableClass; onSelect: () => void }) {
+  const unavailable = course.seats === 0;
+  return <article className="course-card"><div className={`course-cover ${course.language.toLowerCase()}`}><span className="course-language">{course.language.slice(0, 2).toUpperCase()}</span><Badge tone={unavailable ? "amber" : "green"}>{unavailable ? "Sin cupos disponibles" : `Disponible · ${course.seats} cupos`}</Badge></div><div className="course-body"><span className="level">{course.language} · {course.level}</span><h3>{course.name}</h3><div className="course-details"><span><Icon name="calendar" size={17}/><b>{course.date}</b></span><span><Icon name="clock" size={17}/>{course.time}</span><span><Icon name="user" size={17}/>{course.teacher}</span><span><Icon name="school" size={17}/>{course.academy}</span></div><div className="capacity-row"><div><span>Disponibilidad</span><b>{unavailable ? "Sin cupos disponibles" : `${course.seats} cupos disponibles`}</b></div><div className="progress"><i className={unavailable ? "full" : ""} style={{ width: `${((course.total - course.seats) / course.total) * 100}%` }}/></div></div><div className="card-actions"><Button variant="secondary" onClick={onSelect}>Ver detalles</Button><Button disabled={unavailable} onClick={onSelect}>{unavailable ? "Sin cupos disponibles" : "Reservar"}</Button></div></div></article>;
+}
+
+function BookingDetail({ navigate, confirm, course }: { navigate: (s: Screen) => void; confirm: () => void; course: typeof availableClass }) {
+  return <Page role="student" current="search" navigate={navigate}><div className="back-row"><button className="text-button" onClick={() => navigate("search")}><Icon name="chevron" size={17}/> Volver a clases</button></div><div className="booking-layout"><div><span className="eyebrow">Último paso</span><h1>Confirmar reserva</h1><p className="lead">Revisa la información antes de reservar tu cupo.</p><article className="detail-card"><div className="detail-header"><span className="large-course-icon"><Icon name="book" size={30}/></span><div><Badge tone="green">Disponible · {course.seats} cupos</Badge><h2>{course.name}</h2><p>{course.language} · {course.level}</p></div></div><div className="detail-grid"><Detail icon="calendar" label="Fecha" value={course.date}/><Detail icon="clock" label="Horario" value={course.time}/><Detail icon="user" label="Profesor" value={course.teacher}/><Detail icon="school" label="Academia" value={course.academy}/><Detail icon="globe" label="Idioma y nivel" value={`${course.language} · ${course.level}`}/><Detail icon="users" label="Disponibilidad" value={`${course.seats} de ${course.total} cupos disponibles`}/></div></article></div><aside className="confirm-card"><span className="confirm-icon"><Icon name="calendar" size={27}/></span><h2>¿Deseas confirmar esta reserva?</h2><p>Al confirmar, esta clase se agregará a tu agenda.</p><div className="summary-line"><span>Clase</span><b>{course.name}</b></div><div className="summary-line"><span>Fecha</span><b>{course.date} · {course.time.split(" – ")[0]}</b></div><Notice kind="info">Tu cupo se confirmará de inmediato.</Notice><Button onClick={confirm} icon="check">Confirmar reserva</Button><Button variant="ghost" onClick={() => navigate("search")}>Cancelar</Button></aside></div></Page>;
+}
+
+function Detail({ icon, label, value }: { icon: IconName; label: string; value: string }) {
+  return <div className="detail-item"><span><Icon name={icon}/></span><div><small>{label}</small><b>{value}</b></div></div>;
+}
+
+function BookingSuccess({ navigate, course }: { navigate: (s: Screen) => void; course: typeof availableClass }) {
+  return <div className="center-page booking-success"><div className="success-card booking"><Brand/><span className="success-icon"><Icon name="check" size={44}/></span><span className="eyebrow">Reserva confirmada</span><h1>¡Reserva realizada con éxito!</h1><p>Tu cupo ha sido reservado correctamente.</p><div className="success-summary"><div><span className="mini-course"><Icon name="book"/></span><div><small>CURSO</small><b>{course.name}</b><span>{course.language} · {course.level}</span></div><Badge tone="green">Confirmada</Badge></div><div className="success-info"><span><Icon name="calendar"/><small>FECHA<b>{course.date}</b></small></span><span><Icon name="clock"/><small>HORARIO<b>{course.time}</b></small></span></div></div><div className="success-actions"><Button onClick={() => navigate("student-classes")} icon="calendar">Ver mis clases</Button><Button variant="secondary" onClick={() => navigate("student-dashboard")}>Volver al inicio</Button></div><small>Recibirás un recordatorio antes de la clase.</small></div></div>;
+}
+
+function CancellationSuccess({ navigate, course }: { navigate: (s: Screen) => void; course: typeof availableClass }) {
+  return <div className="center-page booking-success"><div className="success-card booking"><Brand/><span className="success-icon"><Icon name="check" size={44}/></span><span className="eyebrow">Cancelación completada</span><h1>¡Reserva cancelada!</h1><p>La reserva de tu clase fue cancelada correctamente.</p><div className="success-summary cancelled-summary"><div><span className="mini-course"><Icon name="book"/></span><div><small>CURSO</small><b>{course.name}</b><span>{course.language} · {course.level}</span></div><Badge tone="red">Cancelada</Badge></div><div className="success-info"><span><Icon name="calendar"/><small>FECHA<b>{course.date}</b></small></span><span><Icon name="clock"/><small>HORARIO<b>{course.time}</b></small></span></div></div><Notice kind="success">Cupo liberado: la clase ahora tiene {course.seats + 1} cupos disponibles.</Notice><div className="success-actions"><Button onClick={() => navigate("student-classes")} icon="calendar">Ver mis clases</Button><Button variant="secondary" onClick={() => navigate("history")}>Ver historial</Button></div></div></div>;
+}
+
+function NoSeats({ navigate }: { navigate: (s: Screen) => void }) {
+  return <div className="center-page"><div className="success-card error-card"><Brand/><span className="error-icon"><Icon name="users" size={42}/></span><span className="eyebrow error-label">Clase completa</span><h1>No hay cupos disponibles para esta clase.</h1><p>Alemán para Viajes A2 alcanzó su capacidad máxima de 14 estudiantes. La reserva no puede completarse.</p><Notice kind="error">No se realizó ningún cargo ni reserva.</Notice><Button onClick={() => navigate("search")} icon="arrow">Volver a clases</Button></div></div>;
+}
+
+function EmptyState({ icon, title, text, action }: { icon: IconName; title: string; text: string; action?: ReactNode }) {
+  return <div className="empty-state"><span><Icon name={icon} size={32}/></span><h3>{title}</h3><p>{text}</p>{action}</div>;
+}
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("01_InicioSesion");
-
-  const navigate = (s: Screen) => setScreen(s);
-
-  return (
-    <div className="font-[Inter,system-ui,sans-serif] min-h-screen">
-      {screen === "01_InicioSesion" && <Screen01Login onNavigate={navigate} />}
-      {screen === "02_TipoUsuario" && <Screen02TipoUsuario onNavigate={navigate} />}
-      {screen === "03_RegistroUsuario" && <Screen03RegistroUsuario onNavigate={navigate} />}
-      {screen === "04_RegistroProveedor" && <Screen04RegistroProveedor onNavigate={navigate} />}
-      {screen === "05_TipoServicio" && <Screen05TipoServicio onNavigate={navigate} />}
-      {screen === "06_Confirmacion_Usuario" && <Screen06Confirmacion onNavigate={navigate} isProvider={false} />}
-      {screen === "06_Confirmacion_Proveedor" && <Screen06Confirmacion onNavigate={navigate} isProvider={true} />}
-      {screen === "07_PanelUsuario" && <Screen07PanelUsuario onNavigate={navigate} />}
-      {screen === "08_PanelProveedor" && <Screen08PanelProveedor onNavigate={navigate} />}
-    </div>
-  );
+  const [screen, setScreen] = useState<Screen>("login");
+  const [role, setRole] = useState<Role>("student");
+  const [user, setUser] = useState<ApiUser | null>(null);
+  const [confirmRole, setConfirmRole] = useState<Role>("student");
+  const [booked, setBooked] = useState(false);
+  const [cancelledCourses, setCancelledCourses] = useState<typeof availableClass[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState(availableClass);
+  const [bookedCourse, setBookedCourse] = useState(availableClass);
+  const [lastCancelledCourse, setLastCancelledCourse] = useState(availableClass);
+  const navigate = (next: Screen) => { setScreen(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  async function confirmBooking() {
+    if (!user || !selectedCourse.id) return;
+    try {
+      if (selectedCourse.id < 1000) {
+        await createReservation(user.id, selectedCourse.id);
+      }
+      setBooked(true);
+      setBookedCourse(selectedCourse);
+      setCancelledCourses((current) => current.filter((course) => course.name !== selectedCourse.name));
+      navigate("booking-success");
+    } catch (requestError) {
+      window.alert(requestError instanceof Error ? requestError.message : "No fue posible reservar la clase.");
+    }
+  }
+  async function cancelBookedCourse(course: typeof availableClass) {
+    if (user && course.reservationId) {
+      try {
+        await cancelReservation(course.reservationId, user.id);
+      } catch (requestError) {
+        window.alert(requestError instanceof Error ? requestError.message : "No fue posible cancelar la reserva.");
+        return;
+      }
+    }
+    setCancelledCourses((current) => current.some((item) => item.name === course.name) ? current : [...current, course]);
+    setLastCancelledCourse(course);
+    navigate("cancellation-success");
+  }
+  const page = useMemo(() => {
+    switch (screen) {
+      case "login": return <Login navigate={navigate} setRole={setRole} setUser={setUser}/>;
+      case "account-type": return <AccountType navigate={navigate}/>;
+      case "student-register": return <Register role="student" navigate={navigate} setConfirmRole={setConfirmRole}/>;
+      case "staff-register": return <Register role="staff" navigate={navigate} setConfirmRole={setConfirmRole}/>;
+      case "language": return <Language navigate={navigate}/>;
+      case "confirmation": return <Confirmation role={confirmRole} navigate={navigate}/>;
+      case "student-dashboard": return user ? <StudentDashboard navigate={navigate} user={user} booked={booked} bookedCourse={bookedCourse} onSelect={(course) => { setSelectedCourse(course); navigate(course.seats ? "booking-detail" : "no-seats"); }}/> : <Login navigate={navigate} setRole={setRole} setUser={setUser}/>;
+      case "staff-dashboard": return user ? <StaffDashboard navigate={navigate} user={user}/> : <Login navigate={navigate} setRole={setRole} setUser={setUser}/>;
+      case "student-classes": return <StudentClasses navigate={navigate} booked={booked} cancelledCourses={cancelledCourses} bookedCourse={bookedCourse} clientId={user?.id || 0} onCancel={cancelBookedCourse} user={user}/>;
+      case "staff-classes": return user ? <StaffClasses navigate={navigate} providerId={user.id} user={user}/> : <Login navigate={navigate} setRole={setRole} setUser={setUser}/>;
+      case "staff-availability": return <StaffAvailability navigate={navigate} user={user}/>;
+      case "history": return <History navigate={navigate} role={role} clientId={user?.id} user={user}/>;
+      case "search": return <SearchClasses navigate={navigate} onSelect={setSelectedCourse} cancelledCourses={cancelledCourses}/>;
+      case "booking-detail": return <BookingDetail navigate={navigate} course={selectedCourse} confirm={confirmBooking}/>;
+      case "booking-success": return <BookingSuccess navigate={navigate} course={selectedCourse}/>;
+      case "cancellation-success": return <CancellationSuccess navigate={navigate} course={lastCancelledCourse}/>;
+      case "no-seats": return <NoSeats navigate={navigate}/>;
+    }
+  }, [screen, role, confirmRole, user, booked, cancelledCourses, selectedCourse, bookedCourse, lastCancelledCourse]);
+  return page;
 }

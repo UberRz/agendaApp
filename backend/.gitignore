@@ -24,7 +24,6 @@ mysql_data/
 postgres_data/
 pgdata/
 pg_data/
-h2-data/
 
 ### SISTEMAS OPERATIVOS ###
 # Archivos basura y ocultos de Windows y Mac

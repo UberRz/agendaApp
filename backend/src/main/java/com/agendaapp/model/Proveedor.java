@@ -18,9 +18,9 @@ public class Proveedor extends Usuario {
         // constructor vacío requerido por JPA
     }
 
-    public Proveedor(String nombre, String email, String password,
-                      String nombreNegocio, String especialidad) {
-        super(nombre, email, password);
+    public Proveedor(String nombre, String email, String username, String telefono, String password,
+            String nombreNegocio, String especialidad) {
+        super(nombre, email, username, telefono, password);
         this.nombreNegocio = nombreNegocio;
         this.especialidad = especialidad;
     }

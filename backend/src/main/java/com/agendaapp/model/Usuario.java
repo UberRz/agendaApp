@@ -3,7 +3,10 @@ package com.agendaapp.model;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "usuarios")
+@Table(name = "usuarios", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_usuario_email", columnNames = "email"),
+        @UniqueConstraint(name = "uk_usuario_username", columnNames = "username")
+})
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @DiscriminatorColumn(name = "tipo_usuario", discriminatorType = DiscriminatorType.STRING)
 public abstract class Usuario {
@@ -18,6 +21,12 @@ public abstract class Usuario {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @Column(unique = true, length = 50)
+    private String username;
+
+    @Column(length = 30)
+    private String telefono;
+
     @Column(nullable = false)
     private String password;
 
@@ -25,9 +34,11 @@ public abstract class Usuario {
         // constructor vacío requerido por JPA/Hibernate
     }
 
-    protected Usuario(String nombre, String email, String password) {
+    protected Usuario(String nombre, String email, String username, String telefono, String password) {
         this.nombre = nombre;
         this.email = email;
+        this.username = username;
+        this.telefono = telefono;
         this.password = password;
     }
 
@@ -49,6 +60,22 @@ public abstract class Usuario {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getTelefono() {
+        return telefono;
+    }
+
+    public void setTelefono(String telefono) {
+        this.telefono = telefono;
     }
 
     public String getPassword() {

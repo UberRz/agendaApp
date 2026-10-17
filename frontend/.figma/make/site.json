@@ -1,5 +1,5 @@
 {
-  "description": "A user-friendly platform for managing service bookings, allowing users and providers to create accounts, schedule appointments, and streamline reservations.",
+  "description": "Platform for language academy students and staff to manage accounts, search, reserve, and track language classes with easy scheduling and clear status updates.",
   "robots": {
     "index": false
   },
