@@ -14,6 +14,7 @@ import com.agendaapp.service.IReservaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -45,6 +46,18 @@ public class ReservaServiceImpl implements IReservaService {
         if (reservaRepository.existsByClienteIdAndServicioIdAndEstado(
                 cliente.getId(), servicio.getId(), EstadoReserva.ACTIVA)) {
             throw new IllegalStateException("El cliente ya tiene una reserva activa para este servicio");
+        }
+
+        LocalDateTime inicio = servicio.getFechaHora();
+        LocalDateTime fin = inicio.plusMinutes(servicio.getDuracion());
+        boolean solapa = reservaRepository
+                .findByClienteConServicio(cliente.getId(), EstadoReserva.ACTIVA)
+                .stream()
+                .map(Reserva::getServicio)
+                .anyMatch(s -> s.getFechaHora().isBefore(fin)
+                        && s.getFechaHora().plusMinutes(s.getDuracion()).isAfter(inicio));
+        if (solapa) {
+            throw new IllegalStateException("El cliente ya tiene una reserva activa en este horario");
         }
 
         long reservasActivas = reservaRepository.countByServicioIdAndEstado(
@@ -112,6 +125,7 @@ public class ReservaServiceImpl implements IReservaService {
                 servicio.getFechaHora(),
                 reserva.getFechaReserva(),
                 reserva.getEstado(),
-                Math.max(cuposDisponibles, 0));
+                Math.max(cuposDisponibles, 0),
+                servicio.getProveedor().getNombre());
     }
 }

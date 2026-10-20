@@ -16,11 +16,12 @@ public class ReservaResponse {
     private final LocalDateTime fechaReserva;
     private final EstadoReserva estado;
     private final long cuposDisponibles;
+    private final String nombreProveedor;
 
     public ReservaResponse(Long id, Long clienteId, String nombreCliente, Long servicioId,
             String nombreServicio, String idioma, String nivel,
             LocalDateTime fechaHora, LocalDateTime fechaReserva,
-            EstadoReserva estado, long cuposDisponibles) {
+            EstadoReserva estado, long cuposDisponibles, String nombreProveedor) {
         this.id = id;
         this.clienteId = clienteId;
         this.nombreCliente = nombreCliente;
@@ -32,6 +33,7 @@ public class ReservaResponse {
         this.fechaReserva = fechaReserva;
         this.estado = estado;
         this.cuposDisponibles = cuposDisponibles;
+        this.nombreProveedor = nombreProveedor;
     }
 
     public Long getId() {
@@ -76,5 +78,9 @@ public class ReservaResponse {
 
     public long getCuposDisponibles() {
         return cuposDisponibles;
+    }
+
+    public String getNombreProveedor() {
+        return nombreProveedor;
     }
 }

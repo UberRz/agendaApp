@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { login, register, listServices, createService, createReservation, listClientReservations, listProviderReservations, cancelReservation, serviceToCourse, reservationToCourse, type ApiService, type ApiUser, type Role } from "./api";
+import { login, register, listServices, createService, createReservation, listClientReservations, listProviderReservations, cancelReservation, serviceToCourse, reservationToCourse, type ApiService, type ApiUser, type ApiReservation, type Role } from "./api";
 
 type Screen =
   | "login"
@@ -219,7 +219,7 @@ function StatCard({ icon, label, value, detail, tone = "blue" }: { icon: IconNam
   return <div className="stat-card"><span className={`stat-icon ${tone}`}><Icon name={icon}/></span><div><p>{label}</p><strong>{value}</strong><small>{detail}</small></div></div>;
 }
 
-function StudentDashboard({ navigate, user, onSelect, booked, bookedCourse }: { navigate: (s: Screen) => void; user: ApiUser; onSelect: (course: typeof availableClass) => void; booked: boolean; bookedCourse: typeof availableClass }) {
+function StudentDashboard({ navigate, user, onSelect, localBookings }: { navigate: (s: Screen) => void; user: ApiUser; onSelect: (course: typeof availableClass) => void; localBookings: typeof availableClass[] }) {
   const [reservations, setReservations] = useState<ReturnType<typeof reservationToCourse>[]>([]);
   const [availableCourses, setAvailableCourses] = useState<typeof availableClass[]>([]);
   useEffect(() => {
@@ -232,7 +232,7 @@ function StudentDashboard({ navigate, user, onSelect, booked, bookedCourse }: { 
       .then((services) => setAvailableCourses(services.length ? services.filter((service) => service.cuposDisponibles > 0).map(serviceToCourse) : staticProviderClasses))
       .catch(() => setAvailableCourses(staticProviderClasses));
   }, []);
-  const dashboardReservations = reservations.length ? reservations : booked ? [bookedCourse] : [];
+  const dashboardReservations = [...reservations, ...localBookings];
   const nextReservation = dashboardReservations[0];
   return <Page role="student" current="student-dashboard" navigate={navigate} user={user}><PageHeading eyebrow="Tu agenda" title={`¡Hola, ${user.nombre}!`} subtitle="Encuentra y reserva tus próximas clases de idiomas." action={<Button onClick={() => navigate("search")} icon="search">Clases disponibles</Button>}/><div className="stats-grid"><StatCard icon="calendar" label="Próximas clases" value={`${dashboardReservations.length}`} detail="Reservas activas"/><StatCard icon="check" label="Reservas activas" value={`${dashboardReservations.length}`} detail="Todas confirmadas" tone="green"/><StatCard icon="book" label="Clases realizadas" value="0" detail="Aún no tienes clases realizadas" tone="purple"/></div><section className="content-section"><div className="section-heading"><div><span className="eyebrow">Tu agenda</span><h2>Próxima clase</h2></div><button className="text-button" onClick={() => navigate("student-classes")}>Ver todas <Icon name="arrow" size={16}/></button></div><div className="featured-class"><div className="date-tile"><b>{nextReservation?.date.split(" ")[0] || "-"}</b><span>{nextReservation?.date.split(" ")[1]?.toUpperCase() || ""}</span></div><div className="class-main"><div className="card-top"><Badge tone={nextReservation ? "green" : "gray"}>{nextReservation ? "Confirmada" : "Sin reservas"}</Badge><span className="language-label"><Icon name="globe" size={15}/> {nextReservation ? `${nextReservation.language} · ${nextReservation.level}` : "Busca una clase disponible"}</span></div><h3>{nextReservation?.name || "Aún no tienes clases agendadas"}</h3><p>{nextReservation ? "Consulta los detalles de tu próxima clase." : "Cuando reserves una clase aparecerá aquí."}</p><div className="meta-row"><span><Icon name="clock" size={17}/>{nextReservation?.time || "-"}</span><span><Icon name="user" size={17}/>{nextReservation?.teacher || "-"}</span><span><Icon name="school" size={17}/>{nextReservation?.academy || "-"}</span></div></div><button className="round-link" aria-label="Ver mis clases" onClick={() => navigate("student-classes")}><Icon name="arrow"/></button></div></section><section className="content-section"><div className="section-heading"><div><span className="eyebrow">Catálogo</span><h2>Clases disponibles</h2></div><button className="text-button" onClick={() => navigate("search")}>Ver catálogo <Icon name="arrow" size={16}/></button></div>{availableCourses.length ? <div className="course-grid">{availableCourses.slice(0, 3).map((course) => <CourseCard key={course.id} course={course} onSelect={() => { onSelect(course); navigate("booking-detail"); }}/>)}</div> : <EmptyState icon="book" title="No hay clases disponibles todavía." text="Cuando un proveedor publique una clase, aparecerá aquí."/>}</section><section className="quick-grid"><button className="quick-card" onClick={() => navigate("search")}><span className="quick-icon"><Icon name="search"/></span><div><b>Clases disponibles</b><p>Explora idiomas, niveles y horarios.</p></div><Icon name="chevron"/></button><button className="quick-card" onClick={() => navigate("history")}><span className="quick-icon mint"><Icon name="history"/></span><div><b>Historial</b><p>Revisa tus clases anteriores.</p></div><Icon name="chevron"/></button></section></Page>;
 }
@@ -282,18 +282,28 @@ function Tabs({ active, setActive, options }: { active: string; setActive: (v: s
   return <div className="tabs">{options.map((option) => <button key={option} className={active === option ? "active" : ""} onClick={() => setActive(option)}>{option}</button>)}</div>;
 }
 
-function StudentClasses({ navigate, booked, cancelledCourses, bookedCourse, clientId, onCancel, user }: { navigate: (s: Screen) => void; booked: boolean; cancelledCourses: typeof availableClass[]; bookedCourse: typeof availableClass; clientId: number; onCancel: (course: typeof availableClass) => void; user?: ApiUser | null }) {
+function StudentClasses({ navigate, localBookings, newBooking, clientId, onCancel, user }: { navigate: (s: Screen) => void; localBookings: typeof availableClass[]; newBooking: string | null; clientId: number; onCancel: (course: typeof availableClass) => void; user?: ApiUser | null }) {
   const [tab, setTab] = useState("Próximas");
   const [confirming, setConfirming] = useState<typeof availableClass | null>(null);
-  const [remoteReservations, setRemoteReservations] = useState<typeof availableClass[]>([]);
+  const [remoteReservations, setRemoteReservations] = useState<ApiReservation[]>([]);
+  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
+    setLoaded(false);
     listClientReservations(clientId)
-      .then((reservations) => setRemoteReservations(reservations.filter((item) => item.estado === "ACTIVA").map(reservationToCourse)))
-      .catch(() => setRemoteReservations([]));
+      .then((reservations) => { setRemoteReservations(reservations); setLoaded(true); })
+      .catch(() => { setRemoteReservations([]); setLoaded(true); });
   }, [clientId]);
-    const upcomingReservations = remoteReservations.length ? remoteReservations : booked ? [bookedCourse] : [];
-  const activeReservations = upcomingReservations.filter((course) => !cancelledCourses.some((cancelled) => cancelled.name === course.name));
-  return <Page role="student" current="student-classes" navigate={navigate} user={user}><PageHeading title="Mis clases agendadas" subtitle="Consulta tus próximas clases y el estado de tus reservas." action={<Button onClick={() => navigate("search")} icon="search">Buscar clases</Button>}/><Tabs active={tab} setActive={setTab} options={["Próximas", "Realizadas"]}/><div className="class-list">{tab === "Próximas" ? (activeReservations.length ? <>{activeReservations.map((course) => <ReservationCard key={course.name} featured={booked && course.name === bookedCourse.name} course={course} onCancel={() => setConfirming(course)}/>) }</> : <EmptyState icon="calendar" title="No tienes clases agendadas." text="Cuando reserves una clase, aparecerá aquí." action={<Button variant="secondary" onClick={() => navigate("search")}>Buscar clases</Button>}/>) : <><ReservationCard completed/><ReservationCard completed second/></>}</div>{confirming && <CancellationModal course={confirming} onKeep={() => setConfirming(null)} onConfirm={() => { const course = confirming; setConfirming(null); onCancel(course); }}/>}</Page>;
+  // Bug 2: todas las reservas activas salen del backend (no solo la última)
+  const activeReservations = remoteReservations
+    .filter((r) => r.estado === "ACTIVA")
+    .map(reservationToCourse);
+  // Bug 1: las "Realizadas" ahora salen de las CANCELADA reales
+  const completedReservations = remoteReservations
+    .filter((r) => r.estado === "CANCELADA")
+    .map(reservationToCourse);
+  // localBookings: solo clases de demostración (id >= 1000) que no existen en el backend
+  const upcomingReservations = [...(loaded ? activeReservations : []), ...localBookings];
+  return <Page role="student" current="student-classes" navigate={navigate} user={user}><PageHeading title="Mis clases agendadas" subtitle="Consulta tus próximas clases y el estado de tus reservas." action={<Button onClick={() => navigate("search")} icon="search">Buscar clases</Button>}/><Tabs active={tab} setActive={setTab} options={["Próximas", "Realizadas"]}/><div className="class-list">{tab === "Próximas" ? (upcomingReservations.length ? upcomingReservations.map((course) => <ReservationCard key={`upcoming-${course.id}-${course.reservationId ?? "local"}`} featured={(course.reservationId ? `r:${course.reservationId}` : `l:${course.id}`) === newBooking} course={course} onCancel={() => setConfirming(course)}/>) : <EmptyState icon="calendar" title="No tienes clases agendadas." text="Cuando reserves una clase, aparecerá aquí." action={<Button variant="secondary" onClick={() => navigate("search")}>Buscar clases</Button>}/>) : completedReservations.length ? completedReservations.map((course) => <ReservationCard key={`done-${course.id}-${course.reservationId}`} course={course} cancelled/>) : <EmptyState icon="history" title="No tienes clases realizadas todavía." text="Las reservas canceladas aparecerán aquí."/>}</div>{confirming && <CancellationModal course={confirming} onKeep={() => setConfirming(null)} onConfirm={() => { const course = confirming; setConfirming(null); onCancel(course); }}/>}</Page>;
 }
 
 function ReservationCard({ featured = false, pending = false, completed = false, second = false, cancelled = false, course, onCancel }: { featured?: boolean; pending?: boolean; completed?: boolean; second?: boolean; cancelled?: boolean; course?: typeof availableClass; onCancel?: () => void }) {
@@ -395,7 +405,7 @@ const classes = [
   { name: "Italiano Conversacional A2", language: "Italiano", level: "A2 Básico", date: "26 oct 2026", time: "17:00 – 19:00", teacher: "Giulia Rossi", academy: "Centro Ágora", seats: 9, total: 14 },
 ];
 
-function SearchClasses({ navigate, onSelect, cancelledCourses }: { navigate: (s: Screen) => void; onSelect: (course: typeof availableClass) => void; cancelledCourses: typeof availableClass[] }) {
+function SearchClasses({ navigate, onSelect, cancelledCourses, user }: { navigate: (s: Screen) => void; onSelect: (course: typeof availableClass) => void; cancelledCourses: typeof availableClass[]; user?: ApiUser | null }) {
   const [query, setQuery] = useState("");
   const [language, setLanguage] = useState("Todos");
   const [level, setLevel] = useState("Todos");
@@ -421,7 +431,7 @@ function SearchClasses({ navigate, onSelect, cancelledCourses }: { navigate: (s:
     setQuery(""); setLanguage("Todos"); setLevel("Todos"); setDate("Todas"); setSchedule("Todos"); setShowFull(false);
   }
   const latestCancellation = cancelledCourses.at(-1);
-  return <Page role="student" current="search" navigate={navigate}><PageHeading title="Clases disponibles" subtitle="Encuentra una clase que se ajuste a tus necesidades y horario."/><div className="search-panel filters-panel"><div className="search-box large"><Icon name="search"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar una clase…"/></div><div className="select-filters"><label><span>Idioma</span><select value={language} onChange={(e) => setLanguage(e.target.value)}><option>Todos</option><option>Inglés</option><option>Francés</option><option>Alemán</option><option>Italiano</option></select></label><label><span>Nivel</span><select value={level} onChange={(e) => setLevel(e.target.value)}><option>Todos</option><option>A1</option><option>A2</option><option>B1</option></select></label><label><span>Fecha</span><select value={date} onChange={(e) => setDate(e.target.value)}><option>Todas</option><option>20 oct 2026</option><option>22 oct 2026</option><option>24 oct 2026</option><option>26 oct 2026</option></select></label><label><span>Horario</span><select value={schedule} onChange={(e) => setSchedule(e.target.value)}><option>Todos</option><option>Mañana</option><option>Tarde</option></select></label></div><div className="filter-footer"><button className={`full-toggle ${showFull ? "active" : ""}`} onClick={() => setShowFull(!showFull)}><span className="toggle-track"><i/></span>Mostrar clases completas</button>{hasFilters && <button className="clear-filters" onClick={clearFilters}>Limpiar filtros</button>}</div></div>{latestCancellation && <Notice kind="success">La cancelación liberó un cupo. {latestCancellation.name} ahora tiene {latestCancellation.seats + 1} cupos disponibles.</Notice>}<div className="results-head"><p><b>{filtered.length} clases</b> {showFull ? "encontradas" : "con cupos disponibles"}</p><span>Ordenar: <b>Más próximas</b></span></div>{filtered.length ? <div className="course-grid">{filtered.map((course) => <CourseCard key={course.name} course={course} onSelect={() => { onSelect(course); navigate(course.seats ? "booking-detail" : "no-seats"); }}/>)}</div> : <EmptyState icon="search" title={hasFilters ? "No encontramos clases disponibles con estos criterios." : "No hay clases disponibles."} text={hasFilters ? "Prueba con otros filtros para encontrar una clase." : "En este momento no existen clases con cupos disponibles. Intenta consultar nuevamente más tarde."} action={hasFilters ? <Button variant="secondary" onClick={clearFilters}>Limpiar filtros</Button> : undefined}/>}</Page>;
+  return <Page role="student" current="search" navigate={navigate} user={user}><PageHeading title="Clases disponibles" subtitle="Encuentra una clase que se ajuste a tus necesidades y horario."/><div className="search-panel filters-panel"><div className="search-box large"><Icon name="search"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar una clase…"/></div><div className="select-filters"><label><span>Idioma</span><select value={language} onChange={(e) => setLanguage(e.target.value)}><option>Todos</option><option>Inglés</option><option>Francés</option><option>Alemán</option><option>Italiano</option></select></label><label><span>Nivel</span><select value={level} onChange={(e) => setLevel(e.target.value)}><option>Todos</option><option>A1</option><option>A2</option><option>B1</option></select></label><label><span>Fecha</span><select value={date} onChange={(e) => setDate(e.target.value)}><option>Todas</option><option>20 oct 2026</option><option>22 oct 2026</option><option>24 oct 2026</option><option>26 oct 2026</option></select></label><label><span>Horario</span><select value={schedule} onChange={(e) => setSchedule(e.target.value)}><option>Todos</option><option>Mañana</option><option>Tarde</option></select></label></div><div className="filter-footer"><button className={`full-toggle ${showFull ? "active" : ""}`} onClick={() => setShowFull(!showFull)}><span className="toggle-track"><i/></span>Mostrar clases completas</button>{hasFilters && <button className="clear-filters" onClick={clearFilters}>Limpiar filtros</button>}</div></div>{latestCancellation && <Notice kind="success">La cancelación liberó un cupo. {latestCancellation.name} ahora tiene {latestCancellation.seats + 1} cupos disponibles.</Notice>}<div className="results-head"><p><b>{filtered.length} clases</b> {showFull ? "encontradas" : "con cupos disponibles"}</p><span>Ordenar: <b>Más próximas</b></span></div>{filtered.length ? <div className="course-grid">{filtered.map((course) => <CourseCard key={course.name} course={course} onSelect={() => { onSelect(course); navigate(course.seats ? "booking-detail" : "no-seats"); }}/>)}</div> : <EmptyState icon="search" title={hasFilters ? "No encontramos clases disponibles con estos criterios." : "No hay clases disponibles."} text={hasFilters ? "Prueba con otros filtros para encontrar una clase." : "En este momento no existen clases con cupos disponibles. Intenta consultar nuevamente más tarde."} action={hasFilters ? <Button variant="secondary" onClick={clearFilters}>Limpiar filtros</Button> : undefined}/>}</Page>;
 }
 
 function CourseCard({ course, onSelect }: { course: typeof availableClass; onSelect: () => void }) {
@@ -429,8 +439,8 @@ function CourseCard({ course, onSelect }: { course: typeof availableClass; onSel
   return <article className="course-card"><div className={`course-cover ${course.language.toLowerCase()}`}><span className="course-language">{course.language.slice(0, 2).toUpperCase()}</span><Badge tone={unavailable ? "amber" : "green"}>{unavailable ? "Sin cupos disponibles" : `Disponible · ${course.seats} cupos`}</Badge></div><div className="course-body"><span className="level">{course.language} · {course.level}</span><h3>{course.name}</h3><div className="course-details"><span><Icon name="calendar" size={17}/><b>{course.date}</b></span><span><Icon name="clock" size={17}/>{course.time}</span><span><Icon name="user" size={17}/>{course.teacher}</span><span><Icon name="school" size={17}/>{course.academy}</span></div><div className="capacity-row"><div><span>Disponibilidad</span><b>{unavailable ? "Sin cupos disponibles" : `${course.seats} cupos disponibles`}</b></div><div className="progress"><i className={unavailable ? "full" : ""} style={{ width: `${((course.total - course.seats) / course.total) * 100}%` }}/></div></div><div className="card-actions"><Button variant="secondary" onClick={onSelect}>Ver detalles</Button><Button disabled={unavailable} onClick={onSelect}>{unavailable ? "Sin cupos disponibles" : "Reservar"}</Button></div></div></article>;
 }
 
-function BookingDetail({ navigate, confirm, course }: { navigate: (s: Screen) => void; confirm: () => void; course: typeof availableClass }) {
-  return <Page role="student" current="search" navigate={navigate}><div className="back-row"><button className="text-button" onClick={() => navigate("search")}><Icon name="chevron" size={17}/> Volver a clases</button></div><div className="booking-layout"><div><span className="eyebrow">Último paso</span><h1>Confirmar reserva</h1><p className="lead">Revisa la información antes de reservar tu cupo.</p><article className="detail-card"><div className="detail-header"><span className="large-course-icon"><Icon name="book" size={30}/></span><div><Badge tone="green">Disponible · {course.seats} cupos</Badge><h2>{course.name}</h2><p>{course.language} · {course.level}</p></div></div><div className="detail-grid"><Detail icon="calendar" label="Fecha" value={course.date}/><Detail icon="clock" label="Horario" value={course.time}/><Detail icon="user" label="Profesor" value={course.teacher}/><Detail icon="school" label="Academia" value={course.academy}/><Detail icon="globe" label="Idioma y nivel" value={`${course.language} · ${course.level}`}/><Detail icon="users" label="Disponibilidad" value={`${course.seats} de ${course.total} cupos disponibles`}/></div></article></div><aside className="confirm-card"><span className="confirm-icon"><Icon name="calendar" size={27}/></span><h2>¿Deseas confirmar esta reserva?</h2><p>Al confirmar, esta clase se agregará a tu agenda.</p><div className="summary-line"><span>Clase</span><b>{course.name}</b></div><div className="summary-line"><span>Fecha</span><b>{course.date} · {course.time.split(" – ")[0]}</b></div><Notice kind="info">Tu cupo se confirmará de inmediato.</Notice><Button onClick={confirm} icon="check">Confirmar reserva</Button><Button variant="ghost" onClick={() => navigate("search")}>Cancelar</Button></aside></div></Page>;
+function BookingDetail({ navigate, confirm, course, user }: { navigate: (s: Screen) => void; confirm: () => void; course: typeof availableClass; user?: ApiUser | null }) {
+  return <Page role="student" current="search" navigate={navigate} user={user}><div className="back-row"><button className="text-button" onClick={() => navigate("search")}><Icon name="chevron" size={17}/> Volver a clases</button></div><div className="booking-layout"><div><span className="eyebrow">Último paso</span><h1>Confirmar reserva</h1><p className="lead">Revisa la información antes de reservar tu cupo.</p><article className="detail-card"><div className="detail-header"><span className="large-course-icon"><Icon name="book" size={30}/></span><div><Badge tone="green">Disponible · {course.seats} cupos</Badge><h2>{course.name}</h2><p>{course.language} · {course.level}</p></div></div><div className="detail-grid"><Detail icon="calendar" label="Fecha" value={course.date}/><Detail icon="clock" label="Horario" value={course.time}/><Detail icon="user" label="Profesor" value={course.teacher}/><Detail icon="school" label="Academia" value={course.academy}/><Detail icon="globe" label="Idioma y nivel" value={`${course.language} · ${course.level}`}/><Detail icon="users" label="Disponibilidad" value={`${course.seats} de ${course.total} cupos disponibles`}/></div></article></div><aside className="confirm-card"><span className="confirm-icon"><Icon name="calendar" size={27}/></span><h2>¿Deseas confirmar esta reserva?</h2><p>Al confirmar, esta clase se agregará a tu agenda.</p><div className="summary-line"><span>Clase</span><b>{course.name}</b></div><div className="summary-line"><span>Fecha</span><b>{course.date} · {course.time.split(" – ")[0]}</b></div><Notice kind="info">Tu cupo se confirmará de inmediato.</Notice><Button onClick={confirm} icon="check">Confirmar reserva</Button><Button variant="ghost" onClick={() => navigate("search")}>Cancelar</Button></aside></div></Page>;
 }
 
 function Detail({ icon, label, value }: { icon: IconName; label: string; value: string }) {
@@ -458,20 +468,23 @@ export default function App() {
   const [role, setRole] = useState<Role>("student");
   const [user, setUser] = useState<ApiUser | null>(null);
   const [confirmRole, setConfirmRole] = useState<Role>("student");
-  const [booked, setBooked] = useState(false);
+  const [localBookings, setLocalBookings] = useState<typeof availableClass[]>([]);
+  const [newBooking, setNewBooking] = useState<string | null>(null);
   const [cancelledCourses, setCancelledCourses] = useState<typeof availableClass[]>([]);
   const [selectedCourse, setSelectedCourse] = useState(availableClass);
-  const [bookedCourse, setBookedCourse] = useState(availableClass);
   const [lastCancelledCourse, setLastCancelledCourse] = useState(availableClass);
   const navigate = (next: Screen) => { setScreen(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
   async function confirmBooking() {
     if (!user || !selectedCourse.id) return;
     try {
       if (selectedCourse.id < 1000) {
-        await createReservation(user.id, selectedCourse.id);
+        const created = await createReservation(user.id, selectedCourse.id);
+        setNewBooking(`r:${created.id}`);
+      } else {
+        // Clase de demostración (no existe en el backend): solo se guarda en local
+        setLocalBookings((current) => current.some((item) => item.id === selectedCourse.id) ? current : [...current, selectedCourse]);
+        setNewBooking(`l:${selectedCourse.id}`);
       }
-      setBooked(true);
-      setBookedCourse(selectedCourse);
       setCancelledCourses((current) => current.filter((course) => course.name !== selectedCourse.name));
       navigate("booking-success");
     } catch (requestError) {
@@ -487,6 +500,7 @@ export default function App() {
         return;
       }
     }
+    if (!course.reservationId) setLocalBookings((current) => current.filter((item) => item.id !== course.id));
     setCancelledCourses((current) => current.some((item) => item.name === course.name) ? current : [...current, course]);
     setLastCancelledCourse(course);
     navigate("cancellation-success");
@@ -499,18 +513,18 @@ export default function App() {
       case "staff-register": return <Register role="staff" navigate={navigate} setConfirmRole={setConfirmRole}/>;
       case "language": return <Language navigate={navigate}/>;
       case "confirmation": return <Confirmation role={confirmRole} navigate={navigate}/>;
-      case "student-dashboard": return user ? <StudentDashboard navigate={navigate} user={user} booked={booked} bookedCourse={bookedCourse} onSelect={(course) => { setSelectedCourse(course); navigate(course.seats ? "booking-detail" : "no-seats"); }}/> : <Login navigate={navigate} setRole={setRole} setUser={setUser}/>;
+      case "student-dashboard": return user ? <StudentDashboard navigate={navigate} user={user} localBookings={localBookings} onSelect={(course) => { setSelectedCourse(course); navigate(course.seats ? "booking-detail" : "no-seats"); }}/> : <Login navigate={navigate} setRole={setRole} setUser={setUser}/>;
       case "staff-dashboard": return user ? <StaffDashboard navigate={navigate} user={user}/> : <Login navigate={navigate} setRole={setRole} setUser={setUser}/>;
-      case "student-classes": return <StudentClasses navigate={navigate} booked={booked} cancelledCourses={cancelledCourses} bookedCourse={bookedCourse} clientId={user?.id || 0} onCancel={cancelBookedCourse} user={user}/>;
+      case "student-classes": return <StudentClasses navigate={navigate} localBookings={localBookings} newBooking={newBooking} clientId={user?.id || 0} onCancel={cancelBookedCourse} user={user}/>;
       case "staff-classes": return user ? <StaffClasses navigate={navigate} providerId={user.id} user={user}/> : <Login navigate={navigate} setRole={setRole} setUser={setUser}/>;
       case "staff-availability": return <StaffAvailability navigate={navigate} user={user}/>;
       case "history": return <History navigate={navigate} role={role} clientId={user?.id} user={user}/>;
-      case "search": return <SearchClasses navigate={navigate} onSelect={setSelectedCourse} cancelledCourses={cancelledCourses}/>;
-      case "booking-detail": return <BookingDetail navigate={navigate} course={selectedCourse} confirm={confirmBooking}/>;
+      case "search": return <SearchClasses navigate={navigate} onSelect={setSelectedCourse} cancelledCourses={cancelledCourses} user={user}/>;
+      case "booking-detail": return <BookingDetail navigate={navigate} course={selectedCourse} confirm={confirmBooking} user={user}/>;
       case "booking-success": return <BookingSuccess navigate={navigate} course={selectedCourse}/>;
       case "cancellation-success": return <CancellationSuccess navigate={navigate} course={lastCancelledCourse}/>;
       case "no-seats": return <NoSeats navigate={navigate}/>;
     }
-  }, [screen, role, confirmRole, user, booked, cancelledCourses, selectedCourse, bookedCourse, lastCancelledCourse]);
+  }, [screen, role, confirmRole, user, localBookings, newBooking, cancelledCourses, selectedCourse, lastCancelledCourse]);
   return page;
 }
