@@ -25,12 +25,18 @@ services:
     container_name: base_backend
     depends_on:
       - postgres
+      - mailpit
     environment:
       # Asegúrate de que el Host coincida con el nombre del servicio o red
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/base_db
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
       CORS_ALLOWED_ORIGINS: http://localhost:3000
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
+      APP_MAIL_FROM: no-reply@agendafacil.local
+      APP_FRONTEND_URL: http://localhost:3000
+      APP_EMAIL_MX_VALIDATION_ENABLED: "true"
     ports:
       - "8080:8080"
     networks:
@@ -45,6 +51,16 @@ services:
       - backend
     ports:
       - "3000:3000"
+    networks:
+      - base_network
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: base_mailpit
+    restart: always
+    ports:
+      - "1025:1025"
+      - "8025:8025"
     networks:
       - base_network
 
