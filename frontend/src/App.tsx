@@ -218,8 +218,6 @@ function Register({ role, navigate, setConfirmRole }: { role: Role; navigate: (s
       if (!form[key as keyof typeof form].trim()) next[key] = "Este campo es obligatorio.";
     });
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = "Utiliza un correo electrónico válido.";
-    if (form.email.toLowerCase() === "registrado@correo.com") next.email = "Este correo electrónico ya está registrado. Utiliza otro correo.";
-    if (form.username.toLowerCase() === "estudiante") next.username = "Este nombre de usuario ya está registrado. Elige otro.";
     if (form.password && (form.password.length < 8 || !/[^\w\s]/.test(form.password))) next.password = "La contraseña debe tener mínimo 8 caracteres y al menos un símbolo.";
     setErrors(next);
     if (!Object.keys(next).length) {
@@ -237,7 +235,12 @@ function Register({ role, navigate, setConfirmRole }: { role: Role; navigate: (s
         setConfirmRole(currentRole);
         navigate(currentRole === "staff" ? "language" : "confirmation");
       } catch (requestError) {
-        setErrors({ form: requestError instanceof Error ? requestError.message : "No fue posible crear la cuenta." });
+        const message = requestError instanceof Error ? requestError.message : "No fue posible crear la cuenta.";
+        const lower = message.toLowerCase();
+        if (/correo|email|dominio/.test(lower)) setErrors({ email: message });
+        else if (/usuario/.test(lower)) setErrors({ username: message });
+        else if (/contraseña/.test(lower)) setErrors({ password: message });
+        else setErrors({ form: message });
       } finally {
         setSubmitting(false);
       }
