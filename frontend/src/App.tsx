@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { login, register, listServices, createService, createReservation, listClientReservations, listProviderReservations, cancelReservation, serviceToCourse, reservationToCourse, type ApiService, type ApiUser, type ApiReservation, type Role } from "./api";
+import { useRef } from "react";
+import { forgotPassword, validateResetToken, resetPassword } from "./api";
 
 type Screen =
   | "login"
@@ -152,31 +154,60 @@ function Login({ navigate, setRole, setUser }: { navigate: (s: Screen) => void; 
 function Recover({ navigate }: { navigate: (s: Screen) => void }) {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
-  function submit(e: FormEvent) {
+  const [sending, setSending] = useState(false);
+  async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) setError("Ingresa un correo electrónico válido.");
-    else navigate("recover-sent");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Ingresa un correo electrónico válido.");
+      return;
+    }
+    setSending(true);
+    try {
+      await forgotPassword(email.trim());
+      navigate("recover-sent");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "No fue posible enviar las instrucciones.");
+    } finally {
+      setSending(false);
+    }
   }
-  return <AuthLayout><div className="auth-form"><span className="mobile-brand"><Brand/></span><div className="form-heading"><span className="eyebrow">Recuperación de acceso</span><h1>Recuperar contraseña</h1><p>Ingresa el correo electrónico asociado a tu cuenta y te enviaremos las instrucciones para recuperar el acceso.</p></div><form onSubmit={submit}><Field label="Correo electrónico" name="email" type="email" value={email} onChange={(v) => { setEmail(v); setError(""); }} error={error} placeholder="nombre@correo.com"/><Button type="submit" icon="arrow">Enviar instrucciones</Button></form><button type="button" className="auth-link back-link" onClick={() => navigate("login")}>Volver al inicio de sesión</button></div></AuthLayout>;
+  return <AuthLayout><div className="auth-form"><span className="mobile-brand"><Brand/></span><div className="form-heading"><span className="eyebrow">Recuperación de acceso</span><h1>Recuperar contraseña</h1><p>Ingresa el correo electrónico asociado a tu cuenta y te enviaremos las instrucciones para recuperar el acceso.</p></div><form onSubmit={submit}><Field label="Correo electrónico" name="email" type="email" value={email} onChange={(v) => { setEmail(v); setError(""); }} error={error} placeholder="nombre@correo.com"/><Button type="submit" disabled={sending} icon="arrow">{sending ? "Enviando..." : "Enviar instrucciones"}</Button></form><button type="button" className="auth-link back-link" onClick={() => navigate("login")}>Volver al inicio de sesión</button></div></AuthLayout>;
 }
 
 function RecoverSent({ navigate }: { navigate: (s: Screen) => void }) {
-  return <div className="center-page"><div className="success-card"><Brand/><span className="success-icon"><Icon name="check" size={42}/></span><span className="eyebrow">Solicitud recibida</span><h1>Revisa tu correo</h1><p>Si existe una cuenta asociada a este correo, recibirás instrucciones para recuperar tu contraseña.</p><Notice kind="info">Para demostrar el flujo, puedes abrir un enlace válido o simular uno vencido.</Notice><div className="state-actions"><Button onClick={() => navigate("reset-password")}>Abrir enlace válido</Button><Button variant="secondary" onClick={() => navigate("reset-expired")}>Simular enlace vencido</Button></div><button type="button" className="auth-link" onClick={() => navigate("login")}>Volver al inicio de sesión</button></div></div>;
+  return <div className="center-page"><div className="success-card"><Brand/><span className="success-icon"><Icon name="check" size={42}/></span><span className="eyebrow">Solicitud recibida</span><h1>Revisa tu correo</h1><p>Si existe una cuenta asociada a este correo, recibirás instrucciones para recuperar tu contraseña.</p><button type="button" className="auth-link" onClick={() => navigate("login")}>Volver al inicio de sesión</button></div></div>;
 }
 
-function ResetPassword({ navigate }: { navigate: (s: Screen) => void }) {
+function ResetPassword({ token, navigate }: { token: string; navigate: (s: Screen) => void }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  function submit(e: FormEvent) {
+  const [saving, setSaving] = useState(false);
+  async function submit(e: FormEvent) {
     e.preventDefault();
     const next: Record<string, string> = {};
     if (password.length < 8 || !/[^\w\s]/.test(password)) next.password = "Usa al menos 8 caracteres y un símbolo.";
     if (password !== confirm) next.confirm = "Las contraseñas no coinciden.";
     setErrors(next);
-    if (!Object.keys(next).length) navigate("reset-success");
+    if (Object.keys(next).length) return;
+    setSaving(true);
+    try {
+      await resetPassword(token, password);
+      window.history.replaceState({}, "", "/");
+      navigate("reset-success");
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "No fue posible actualizar la contraseña.";
+      if (/enlace|venci/i.test(message)) {
+        window.history.replaceState({}, "", "/");
+        navigate("reset-expired");
+      } else {
+        setErrors({ password: message });
+      }
+    } finally {
+      setSaving(false);
+    }
   }
-  return <AuthLayout><div className="auth-form"><span className="mobile-brand"><Brand/></span><div className="form-heading"><span className="eyebrow">Enlace verificado</span><h1>Crea una nueva contraseña</h1><p>La nueva contraseña debe ser segura y distinta a las anteriores.</p></div><form onSubmit={submit}><Field label="Nueva contraseña" name="password" type="password" value={password} onChange={setPassword} error={errors.password}/><Field label="Confirmar nueva contraseña" name="confirm" type="password" value={confirm} onChange={setConfirm} error={errors.confirm}/><Button type="submit">Guardar contraseña</Button></form></div></AuthLayout>;
+  return <AuthLayout><div className="auth-form"><span className="mobile-brand"><Brand/></span><div className="form-heading"><span className="eyebrow">Enlace verificado</span><h1>Crea una nueva contraseña</h1><p>La nueva contraseña debe ser segura y distinta a las anteriores.</p></div><form onSubmit={submit}><Field label="Nueva contraseña" name="password" type="password" value={password} onChange={setPassword} error={errors.password}/><Field label="Confirmar nueva contraseña" name="confirm" type="password" value={confirm} onChange={setConfirm} error={errors.confirm}/><Button type="submit" disabled={saving}>{saving ? "Guardando..." : "Guardar contraseña"}</Button></form></div></AuthLayout>;
 }
 
 function AccountType({ navigate }: { navigate: (s: Screen) => void }) {
@@ -218,8 +249,6 @@ function Register({ role, navigate, setConfirmRole }: { role: Role; navigate: (s
       if (!form[key as keyof typeof form].trim()) next[key] = "Este campo es obligatorio.";
     });
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = "Utiliza un correo electrónico válido.";
-    if (form.email.toLowerCase() === "registrado@correo.com") next.email = "Este correo electrónico ya está registrado. Utiliza otro correo.";
-    if (form.username.toLowerCase() === "estudiante") next.username = "Este nombre de usuario ya está registrado. Elige otro.";
     if (form.password && (form.password.length < 8 || !/[^\w\s]/.test(form.password))) next.password = "La contraseña debe tener mínimo 8 caracteres y al menos un símbolo.";
     setErrors(next);
     if (!Object.keys(next).length) {
@@ -237,7 +266,12 @@ function Register({ role, navigate, setConfirmRole }: { role: Role; navigate: (s
         setConfirmRole(currentRole);
         navigate(currentRole === "staff" ? "language" : "confirmation");
       } catch (requestError) {
-        setErrors({ form: requestError instanceof Error ? requestError.message : "No fue posible crear la cuenta." });
+        const message = requestError instanceof Error ? requestError.message : "No fue posible crear la cuenta.";
+        const lower = message.toLowerCase();
+        if (/correo|email|dominio/.test(lower)) setErrors({ email: message });
+        else if (/usuario/.test(lower)) setErrors({ username: message });
+        else if (/contraseña/.test(lower)) setErrors({ password: message });
+        else setErrors({ form: message });
       } finally {
         setSubmitting(false);
       }
@@ -686,6 +720,22 @@ function EmptyState({ icon, title, text, action }: { icon: IconName; title: stri
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("login");
+  const [resetToken, setResetToken] = useState("");
+  const resetChecked = useRef(false);
+  useEffect(() => {
+    if (resetChecked.current) return;
+    resetChecked.current = true;
+    if (window.location.pathname !== "/restablecer") return;
+    const token = new URLSearchParams(window.location.search).get("token") || "";
+    if (!token) {
+      setScreen("reset-expired");
+      return;
+    }
+    setResetToken(token);
+    validateResetToken(token)
+      .then((result) => setScreen(result.valido ? "reset-password" : "reset-expired"))
+      .catch(() => setScreen("reset-expired"));
+  }, []);
   const [role, setRole] = useState<Role>("student");
   const [user, setUser] = useState<ApiUser | null>(null);
   const [confirmRole, setConfirmRole] = useState<Role>("student");
@@ -780,8 +830,8 @@ export default function App() {
       case "login": return <Login navigate={navigate} setRole={setRole} setUser={setUser}/>;
       case "recover": return <Recover navigate={navigate}/>;
       case "recover-sent": return <RecoverSent navigate={navigate}/>;
-      case "reset-password": return <ResetPassword navigate={navigate}/>;
-      case "reset-expired": return <div className="center-page"><div className="success-card error-card"><Brand/><span className="error-icon"><Icon name="alert" size={42}/></span><span className="eyebrow error-label">Enlace no disponible</span><h1>Este enlace ya no es válido</h1><p>Este enlace ya no es válido. Solicita uno nuevo para recuperar tu contraseña.</p><Button onClick={() => navigate("recover")}>Solicitar un nuevo enlace</Button></div></div>;
+      case "reset-password": return <ResetPassword token={resetToken} navigate={navigate}/>;
+      case "reset-expired": return <div className="center-page"><div className="success-card error-card"><Brand/><span className="error-icon"><Icon name="alert" size={42}/></span><span className="eyebrow error-label">Enlace no disponible</span><h1>Este enlace ya no es válido</h1><p>Este enlace ya no es válido. Solicita uno nuevo para recuperar tu contraseña.</p><Button onClick={() => { window.history.replaceState({}, "", "/"); navigate("recover"); }}>Solicitar un nuevo enlace</Button></div></div>;
       case "reset-success": return <div className="center-page"><div className="success-card"><Brand/><span className="success-icon"><Icon name="check" size={42}/></span><span className="eyebrow">Contraseña actualizada</span><h1>Tu contraseña se actualizó correctamente.</h1><p>Ya puedes acceder a Agenda Fácil con tu nueva contraseña.</p><Button onClick={() => navigate("login")}>Ir al inicio de sesión</Button></div></div>;
       case "access-denied": return <div className="center-page"><div className="success-card error-card"><Brand/><span className="error-icon"><Icon name="alert" size={42}/></span><span className="eyebrow error-label">Acceso denegado</span><h1>No tienes permisos para acceder a esta sección.</h1><p>Tu perfil actual no cuenta con autorización para ver esta funcionalidad.</p><Button onClick={() => navigate(role === "student" ? "student-dashboard" : "staff-dashboard")}>Volver a mi inicio</Button></div></div>;
       case "foreign-reservation": return <div className="center-page"><div className="success-card error-card"><Brand/><span className="error-icon"><Icon name="alert" size={42}/></span><span className="eyebrow error-label">Reserva protegida</span><h1>No tienes autorización para acceder a esta reserva.</h1><p>La reserva pertenece a otro estudiante y no se mostró información privada.</p><Button onClick={() => navigate("student-classes")}>Volver a mis reservas</Button></div></div>;
@@ -803,6 +853,6 @@ export default function App() {
       case "no-seats": return <NoSeats navigate={navigate}/>;
       default: return <Login navigate={navigate} setRole={setRole} setUser={setUser}/>;
     }
-  }, [screen, role, confirmRole, user, localBookings, newBooking, cancelledCourses, selectedCourse, lastCancelledCourse]);
+  }, [screen, role, confirmRole, user, localBookings, newBooking, cancelledCourses, selectedCourse, lastCancelledCourse, resetToken]);
   return page;
 }

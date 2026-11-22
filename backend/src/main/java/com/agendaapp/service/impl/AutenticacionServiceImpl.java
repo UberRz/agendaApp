@@ -7,7 +7,9 @@ import com.agendaapp.model.Cliente;
 import com.agendaapp.model.Proveedor;
 import com.agendaapp.model.Usuario;
 import com.agendaapp.repository.UsuarioRepository;
+import com.agendaapp.service.EmailDomainValidator;
 import com.agendaapp.service.IAutenticacionService;
+import com.agendaapp.service.PasswordPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -19,13 +21,19 @@ public class AutenticacionServiceImpl implements IAutenticacionService {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordPolicy passwordPolicy;
+    private final EmailDomainValidator emailDomainValidator;
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
-    private static final Pattern PASSWORD_SYMBOL_PATTERN = Pattern.compile(".*[^\\w\\s].*");
 
-    public AutenticacionServiceImpl(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
+    public AutenticacionServiceImpl(UsuarioRepository usuarioRepository,
+            PasswordEncoder passwordEncoder,
+            PasswordPolicy passwordPolicy,
+            EmailDomainValidator emailDomainValidator) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+        this.passwordPolicy = passwordPolicy;
+        this.emailDomainValidator = emailDomainValidator;
     }
 
     @Override
@@ -61,6 +69,8 @@ public class AutenticacionServiceImpl implements IAutenticacionService {
         validarRegistro(request);
 
         String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
+        emailDomainValidator.validarDominio(email);
+
         String username = request.getUsername().trim().toLowerCase(Locale.ROOT);
         if (usuarioRepository.existsByEmail(email)) {
             throw new RuntimeException("Ya existe un usuario registrado con ese email");
@@ -113,9 +123,7 @@ public class AutenticacionServiceImpl implements IAutenticacionService {
         if (!EMAIL_PATTERN.matcher(request.getEmail().trim()).matches()) {
             throw new IllegalArgumentException("El correo electrónico no es válido");
         }
-        if (request.getPassword().length() < 8 || !PASSWORD_SYMBOL_PATTERN.matcher(request.getPassword()).matches()) {
-            throw new IllegalArgumentException("La contraseña debe tener mínimo 8 caracteres y un símbolo");
-        }
+        passwordPolicy.validar(request.getPassword());
         if (!"CLIENTE".equalsIgnoreCase(request.getTipoUsuario())
                 && !"PROVEEDOR".equalsIgnoreCase(request.getTipoUsuario())) {
             throw new IllegalArgumentException("tipoUsuario debe ser CLIENTE o PROVEEDOR");
