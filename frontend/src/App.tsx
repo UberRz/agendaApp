@@ -3,6 +3,13 @@ import { login, register, listServices, createService, createReservation, listCl
 
 type Screen =
   | "login"
+  | "recover"
+  | "recover-sent"
+  | "reset-password"
+  | "reset-expired" 
+  | "reset-success"
+  | "access-denied"
+  | "foreign-reservation"
   | "account-type"
   | "student-register"
   | "staff-register"
@@ -139,7 +146,37 @@ function Login({ navigate, setRole, setUser }: { navigate: (s: Screen) => void; 
       setSubmitting(false);
     }
   }
-  return <AuthLayout><div className="auth-form login-form"><span className="mobile-brand"><Brand/></span><div className="form-heading"><span className="eyebrow">Bienvenido de nuevo</span><h1>Inicia sesión</h1><p>Accede a tu cuenta para continuar aprendiendo.</p></div>{error && <Notice kind="error">{error}</Notice>}<form onSubmit={submit}><Field label="Nombre de usuario o correo" name="username" value={username} onChange={(v) => { setUsername(v); setError(""); }} placeholder="Escribe tu usuario o correo" error={error ? "Revisa los datos ingresados." : undefined}/><Field label="Contraseña" name="password" type="password" value={password} onChange={(v) => { setPassword(v); setError(""); }} placeholder="Ingresa tu contraseña" error={error ? "Revisa los datos ingresados." : undefined}/><Button type="submit" disabled={submitting} icon="arrow">{submitting ? "Ingresando..." : "Iniciar sesión"}</Button></form><div className="demo-box"><b>Acceso de demostración</b><p>Usa las credenciales configuradas en PostgreSQL.</p></div><div className="divider"><span>¿Aún no tienes cuenta?</span></div><Button variant="secondary" onClick={() => navigate("account-type")}>Crear una cuenta</Button><p className="auth-footnote">Para estudiantes y personal de la academia.</p></div></AuthLayout>;
+  return <AuthLayout><div className="auth-form login-form"><span className="mobile-brand"><Brand/></span><div className="form-heading"><span className="eyebrow">Bienvenido de nuevo</span><h1>Inicia sesión</h1><p>Accede a tu cuenta para continuar aprendiendo.</p></div>{error && <Notice kind="error">{error}</Notice>}<form onSubmit={submit}><Field label="Nombre de usuario o correo" name="username" value={username} onChange={(v) => { setUsername(v); setError(""); }} placeholder="Escribe tu usuario o correo" error={error ? "Revisa los datos ingresados." : undefined}/><Field label="Contraseña" name="password" type="password" value={password} onChange={(v) => { setPassword(v); setError(""); }} placeholder="Ingresa tu contraseña" error={error ? "Revisa los datos ingresados." : undefined}/><button type="button" className="auth-link forgot-link" onClick={() => navigate("recover")}>¿Olvidaste tu contraseña?</button><Button type="submit" disabled={submitting} icon="arrow">{submitting ? "Ingresando..." : "Iniciar sesión"}</Button></form><div className="demo-box"><b>Acceso de demostración</b><p>Usa las credenciales configuradas en PostgreSQL.</p></div><div className="divider"><span>¿Aún no tienes cuenta?</span></div><Button variant="secondary" onClick={() => navigate("account-type")}>Crear una cuenta</Button><p className="auth-footnote">Para estudiantes y personal de la academia.</p></div></AuthLayout>;
+}
+
+function Recover({ navigate }: { navigate: (s: Screen) => void }) {
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) setError("Ingresa un correo electrónico válido.");
+    else navigate("recover-sent");
+  }
+  return <AuthLayout><div className="auth-form"><span className="mobile-brand"><Brand/></span><div className="form-heading"><span className="eyebrow">Recuperación de acceso</span><h1>Recuperar contraseña</h1><p>Ingresa el correo electrónico asociado a tu cuenta y te enviaremos las instrucciones para recuperar el acceso.</p></div><form onSubmit={submit}><Field label="Correo electrónico" name="email" type="email" value={email} onChange={(v) => { setEmail(v); setError(""); }} error={error} placeholder="nombre@correo.com"/><Button type="submit" icon="arrow">Enviar instrucciones</Button></form><button type="button" className="auth-link back-link" onClick={() => navigate("login")}>Volver al inicio de sesión</button></div></AuthLayout>;
+}
+
+function RecoverSent({ navigate }: { navigate: (s: Screen) => void }) {
+  return <div className="center-page"><div className="success-card"><Brand/><span className="success-icon"><Icon name="check" size={42}/></span><span className="eyebrow">Solicitud recibida</span><h1>Revisa tu correo</h1><p>Si existe una cuenta asociada a este correo, recibirás instrucciones para recuperar tu contraseña.</p><Notice kind="info">Para demostrar el flujo, puedes abrir un enlace válido o simular uno vencido.</Notice><div className="state-actions"><Button onClick={() => navigate("reset-password")}>Abrir enlace válido</Button><Button variant="secondary" onClick={() => navigate("reset-expired")}>Simular enlace vencido</Button></div><button type="button" className="auth-link" onClick={() => navigate("login")}>Volver al inicio de sesión</button></div></div>;
+}
+
+function ResetPassword({ navigate }: { navigate: (s: Screen) => void }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    const next: Record<string, string> = {};
+    if (password.length < 8 || !/[^\w\s]/.test(password)) next.password = "Usa al menos 8 caracteres y un símbolo.";
+    if (password !== confirm) next.confirm = "Las contraseñas no coinciden.";
+    setErrors(next);
+    if (!Object.keys(next).length) navigate("reset-success");
+  }
+  return <AuthLayout><div className="auth-form"><span className="mobile-brand"><Brand/></span><div className="form-heading"><span className="eyebrow">Enlace verificado</span><h1>Crea una nueva contraseña</h1><p>La nueva contraseña debe ser segura y distinta a las anteriores.</p></div><form onSubmit={submit}><Field label="Nueva contraseña" name="password" type="password" value={password} onChange={setPassword} error={errors.password}/><Field label="Confirmar nueva contraseña" name="confirm" type="password" value={confirm} onChange={setConfirm} error={errors.confirm}/><Button type="submit">Guardar contraseña</Button></form></div></AuthLayout>;
 }
 
 function AccountType({ navigate }: { navigate: (s: Screen) => void }) {
@@ -157,15 +194,29 @@ function SelectionCard({ icon, title, description, selected, onClick }: { icon: 
 }
 
 function Register({ role, navigate, setConfirmRole }: { role: Role; navigate: (s: Screen) => void; setConfirmRole: (r: Role) => void }) {
+  const [currentRole, setCurrentRole] = useState<Role>(role);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  const update = (key: string, value: string) => { setForm({ ...form, [key]: value }); setErrors({ ...errors, [key]: "" }); };
+
+  const switchRole = (nextRole: Role) => {
+    setCurrentRole(nextRole);
+    setForm((prev) => ({ ...prev, academy: nextRole === "student" ? "" : prev.academy }));
+    setErrors({});
+  };
+
+  const update = (key: string, value: string) => {
+    setForm({ ...form, [key]: value });
+    setErrors({ ...errors, [key]: "" });
+  };
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     const next: Record<string, string> = {};
-    const required = role === "staff" ? Object.keys(initialForm) : Object.keys(initialForm).filter((k) => k !== "academy");
-    required.forEach((key) => { if (!form[key as keyof typeof form].trim()) next[key] = "Este campo es obligatorio."; });
+    const required = currentRole === "staff" ? Object.keys(initialForm) : Object.keys(initialForm).filter((k) => k !== "academy");
+    required.forEach((key) => {
+      if (!form[key as keyof typeof form].trim()) next[key] = "Este campo es obligatorio.";
+    });
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = "Utiliza un correo electrónico válido.";
     if (form.email.toLowerCase() === "registrado@correo.com") next.email = "Este correo electrónico ya está registrado. Utiliza otro correo.";
     if (form.username.toLowerCase() === "estudiante") next.username = "Este nombre de usuario ya está registrado. Elige otro.";
@@ -180,11 +231,11 @@ function Register({ role, navigate, setConfirmRole }: { role: Role; navigate: (s
           username: form.username,
           telefono: form.phone,
           password: form.password,
-          tipoUsuario: role === "staff" ? "PROVEEDOR" : "CLIENTE",
+          tipoUsuario: currentRole === "staff" ? "PROVEEDOR" : "CLIENTE",
           nombreNegocio: form.academy,
         });
-        setConfirmRole(role);
-        navigate(role === "staff" ? "language" : "confirmation");
+        setConfirmRole(currentRole);
+        navigate(currentRole === "staff" ? "language" : "confirmation");
       } catch (requestError) {
         setErrors({ form: requestError instanceof Error ? requestError.message : "No fue posible crear la cuenta." });
       } finally {
@@ -192,8 +243,46 @@ function Register({ role, navigate, setConfirmRole }: { role: Role; navigate: (s
       }
     }
   }
-  const student = role === "student";
-  return <AuthLayout step={student ? "Paso 2 de 2" : "Paso 2 de 3"}><div className="auth-form register-form"><span className="mobile-brand"><Brand/></span><div className="form-heading"><span className="eyebrow">{student ? "Cuenta de estudiante" : "Cuenta de academia"}</span><h1>{student ? "Crea tu cuenta de estudiante" : "Registra tu cuenta de academia"}</h1><p>{student ? "Ingresa tus datos para comenzar a reservar clases." : "Completa tus datos para gestionar las clases y reservas."}</p></div>{Object.keys(errors).length > 2 && <Notice kind="error">Completa todos los campos obligatorios para continuar.</Notice>}<form onSubmit={submit}><div className="form-grid"><Field label="Nombre completo" name="name" value={form.name} onChange={(v) => update("name", v)} placeholder="Ej. Lucía Martínez" error={errors.name}/><Field label="Correo electrónico" name="email" type="email" value={form.email} onChange={(v) => update("email", v)} placeholder="nombre@correo.com" helper="Utiliza un correo electrónico válido." error={errors.email}/><Field label="Nombre de usuario" name="username" value={form.username} onChange={(v) => update("username", v)} placeholder="Elige un usuario" helper="El nombre de usuario debe ser único." error={errors.username}/><Field label="Número telefónico" name="phone" type="tel" value={form.phone} onChange={(v) => update("phone", v)} placeholder="+34 600 000 000" error={errors.phone}/>{!student && <Field label="Nombre de la academia" name="academy" value={form.academy} onChange={(v) => update("academy", v)} placeholder="Ej. Centro de Idiomas Ágora" error={errors.academy}/>}<Field label="Contraseña" name="password" type="password" value={form.password} onChange={(v) => update("password", v)} placeholder="Crea una contraseña segura" helper="Mínimo 8 caracteres y al menos un símbolo." error={errors.password}/></div><div className="form-actions"><Button variant="secondary" onClick={() => navigate("account-type")}>Volver</Button><Button type="submit" icon="arrow">{student ? "Crear cuenta" : "Continuar"}</Button></div></form><p className="required-note">* Campos obligatorios</p></div></AuthLayout>;
+
+  const student = currentRole === "student";
+
+  return (
+    <AuthLayout step={student ? "Paso 2 de 2" : "Paso 2 de 3"}>
+      <div className="auth-form register-form">
+        <span className="mobile-brand"><Brand /></span>
+        <div className="form-heading">
+          <span className="eyebrow">{student ? "Cuenta de estudiante" : "Cuenta de docente / academia"}</span>
+          <h1>{student ? "Crea tu cuenta de estudiante" : "Registra tu cuenta de docente"}</h1>
+          <p>{student ? "Ingresa tus datos para comenzar a reservar clases." : "Completa tus datos para gestionar tus clases y horarios."}</p>
+        </div>
+        <div className="profile-switch" role="group" aria-label="Tipo de usuario">
+          <button type="button" className={student ? "active" : ""} onClick={() => switchRole("student")}>
+            <Icon name="user" />Estudiante
+          </button>
+          <button type="button" className={!student ? "active" : ""} onClick={() => switchRole("staff")}>
+            <Icon name="school" />Docente / Academia
+          </button>
+        </div>
+        {errors.form && <Notice kind="error">{errors.form}</Notice>}
+        {Object.keys(errors).length > 2 && <Notice kind="error">Completa todos los campos obligatorios para continuar.</Notice>}
+        <form onSubmit={submit}>
+          <div className="form-grid">
+            <Field label="Nombre completo" name="name" value={form.name} onChange={(v) => update("name", v)} placeholder="Ej. Lucía Martínez" error={errors.name} />
+            <Field label="Correo electrónico" name="email" type="email" value={form.email} onChange={(v) => update("email", v)} placeholder="nombre@correo.com" helper="Utiliza un correo electrónico válido." error={errors.email} />
+            <Field label="Nombre de usuario" name="username" value={form.username} onChange={(v) => update("username", v)} placeholder="Elige un usuario" helper="El nombre de usuario debe ser único." error={errors.username} />
+            <Field label="Número telefónico" name="phone" type="tel" value={form.phone} onChange={(v) => update("phone", v)} placeholder="+34 600 000 000" error={errors.phone} />
+            {!student && <Field label="Nombre de la academia" name="academy" value={form.academy} onChange={(v) => update("academy", v)} placeholder="Ej. Centro de Idiomas Ágora" error={errors.academy} />}
+            <Field label="Contraseña" name="password" type="password" value={form.password} onChange={(v) => update("password", v)} placeholder="Crea una contraseña segura" helper="Mínimo 8 caracteres y al menos un símbolo." error={errors.password} />
+          </div>
+          <div className="form-actions">
+            <Button variant="secondary" onClick={() => navigate("account-type")}>Volver</Button>
+            <Button type="submit" disabled={submitting} icon="arrow">{submitting ? "Creando..." : student ? "Crear cuenta" : "Continuar"}</Button>
+          </div>
+        </form>
+        <p className="required-note">* Campos obligatorios</p>
+      </div>
+    </AuthLayout>
+  );
 }
 
 function Language({ navigate }: { navigate: (s: Screen) => void }) {
@@ -362,18 +451,150 @@ function ScheduleItem({ name, level, date, time, current, total, status = "Progr
 }
 
 function StaffAvailability({ navigate, user }: { navigate: (s: Screen) => void; user?: ApiUser | null }) {
-  const upcoming = academyClasses.filter((item) => item.status === "Programada");
-  const [capacities, setCapacities] = useState<Record<string, number>>(() => Object.fromEntries(upcoming.map((item) => [item.name, item.total])));
-  const [saved, setSaved] = useState("");
-  function changeCapacity(name: string, current: number, amount: number) {
-    setSaved("");
-    setCapacities((values) => ({ ...values, [name]: Math.max(current, Math.min(40, values[name] + amount)) }));
+  const [schedules, setSchedules] = useState([
+    { id: 1, course: "Inglés Conversacional B1", language: "Inglés", level: "B1", date: "2026-10-20", start: "18:00", end: "20:00", teacher: "Laura González", room: "Aula Norte 2" },
+    { id: 2, course: "Francés Inicial A1", language: "Francés", level: "A1", date: "2026-10-22", start: "10:00", end: "12:00", teacher: "Sophie Martin", room: "Aula Jardín" },
+    { id: 3, course: "Alemán Intermedio B1", language: "Alemán", level: "B1", date: "2026-10-24", start: "09:00", end: "11:00", teacher: "", room: "" },
+  ]);
+  const [form, setForm] = useState({ course: "", language: "", level: "", date: "", start: "", end: "" });
+  const [scheduleMsg, setScheduleMsg] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+
+  const [selectedId, setSelectedId] = useState("3");
+  const [teacher, setTeacher] = useState("");
+  const [room, setRoom] = useState("");
+  const [resourceMsg, setResourceMsg] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+
+  function saveSchedule(e: FormEvent) {
+    e.preventDefault();
+    if (!form.course.trim() || !form.language.trim() || !form.level.trim() || !form.date || !form.start || !form.end) {
+      return setScheduleMsg({ kind: "error", text: "Completa todos los campos obligatorios antes de guardar." });
+    }
+    if (form.end <= form.start) {
+      return setScheduleMsg({ kind: "error", text: "La hora de finalización debe ser posterior a la hora de inicio." });
+    }
+    const newId = Date.now();
+    setSchedules((prev) => [...prev, { id: newId, ...form, teacher: "", room: "" }]);
+    setSelectedId(String(newId));
+    setForm({ course: "", language: "", level: "", date: "", start: "", end: "" });
+    setScheduleMsg({ kind: "success", text: "Horario registrado correctamente en la programación." });
   }
-  return <Page role="staff" current="staff-availability" navigate={navigate} user={user}><PageHeading title="Disponibilidad y cupos" subtitle="Configura la capacidad de tus próximas clases y consulta los cupos restantes."/><div className="availability-summary"><StatCard icon="clock" label="Cupos disponibles" value="42" detail="En clases programadas" tone="amber"/><StatCard icon="users" label="Capacidad total" value="70" detail="En 4 clases activas"/><StatCard icon="alert" label="Clases completas" value="1" detail="Requiere seguimiento" tone="purple"/></div>{saved && <Notice kind="success">La capacidad de {saved} se actualizó correctamente.</Notice>}<div className="availability-list">{upcoming.map((item) => {
-    const capacity = capacities[item.name];
-    const remaining = capacity - item.current;
-    return <article className="availability-card" key={item.name}><div className="availability-course"><span className="mini-course"><Icon name="book"/></span><div><h3>{item.name}</h3><p>{item.level} · {item.date} · {item.time}</p></div></div><div className="availability-metric"><small>ESTUDIANTES REGISTRADOS</small><b>{item.current}</b></div><div className="availability-metric"><small>CUPOS DISPONIBLES</small><b className={remaining === 0 ? "no-seats-text" : ""}>{remaining}</b></div><div className="capacity-control"><small>CAPACIDAD TOTAL</small><div><button aria-label={`Reducir capacidad de ${item.name}`} disabled={capacity <= item.current} onClick={() => changeCapacity(item.name, item.current, -1)}>−</button><b>{capacity}</b><button aria-label={`Aumentar capacidad de ${item.name}`} onClick={() => changeCapacity(item.name, item.current, 1)}>+</button></div></div><Button variant="secondary" onClick={() => setSaved(item.name)}>Guardar</Button></article>;
-  })}</div></Page>;
+
+  const selected = schedules.find((s) => String(s.id) === selectedId);
+  const overlaps = (aStart: string, aEnd: string, bStart: string, bEnd: string) => aStart < bEnd && aEnd > bStart;
+  const busyTeachers = schedules
+    .filter((s) => s.id !== selected?.id && s.date === selected?.date && selected && overlaps(s.start, s.end, selected.start, selected.end))
+    .map((s) => s.teacher);
+  const busyRooms = schedules
+    .filter((s) => s.id !== selected?.id && s.date === selected?.date && selected && overlaps(s.start, s.end, selected.start, selected.end))
+    .map((s) => s.room);
+
+  const availableTeachers = ["Laura González", "Sophie Martin", "Felix Müller", "Giulia Rossi"].filter((t) => !busyTeachers.includes(t));
+  const availableRooms = ["Aula Norte 1", "Aula Norte 2", "Aula Jardín", "Sala Roma"].filter((r) => !busyRooms.includes(r));
+
+  function assignResources() {
+    if (!selected || !teacher || !room) {
+      return setResourceMsg({ kind: "error", text: "Selecciona un horario, un docente y un espacio disponibles." });
+    }
+    if (busyTeachers.includes(teacher) || busyRooms.includes(room)) {
+      return setResourceMsg({ kind: "error", text: "Este recurso no está disponible en el horario seleccionado." });
+    }
+    setSchedules((prev) => prev.map((s) => (s.id === selected.id ? { ...s, teacher, room } : s)));
+    setResourceMsg({ kind: "success", text: `Asignado: ${teacher} en ${room} para ${selected.course}.` });
+  }
+
+  return (
+    <Page role="staff" current="staff-availability" navigate={navigate} user={user}>
+      <PageHeading
+        eyebrow="Gestión académica"
+        title="Horarios y asignación de recursos"
+        subtitle="Define horarios disponibles (HU-09) y asigna docentes y espacios sin cruces (HU-12)."
+      />
+
+      <div className="management-layout" style={{ marginBottom: 32 }}>
+        <form className="management-form" onSubmit={saveSchedule}>
+          <div>
+            <span className="eyebrow">HU-09 · Nuevo horario</span>
+            <h2>Definir disponibilidad</h2>
+          </div>
+          {scheduleMsg && <Notice kind={scheduleMsg.kind}>{scheduleMsg.text}</Notice>}
+          <Field label="Curso o clase" name="course" value={form.course} onChange={(v) => setForm({ ...form, course: v })} placeholder="Ej. Inglés Conversacional B2" />
+          <div className="form-grid">
+            <Field label="Idioma" name="language" value={form.language} onChange={(v) => setForm({ ...form, language: v })} placeholder="Inglés" />
+            <Field label="Nivel" name="level" value={form.level} onChange={(v) => setForm({ ...form, level: v })} placeholder="B2" />
+            <Field label="Fecha" name="date" type="date" value={form.date} onChange={(v) => setForm({ ...form, date: v })} />
+            <Field label="Hora inicio" name="start" type="time" value={form.start} onChange={(v) => setForm({ ...form, start: v })} />
+            <Field label="Hora fin" name="end" type="time" value={form.end} onChange={(v) => setForm({ ...form, end: v })} />
+          </div>
+          <Button type="submit" icon="check">Guardar horario</Button>
+        </form>
+
+        <section className="management-form">
+          <div>
+            <span className="eyebrow">HU-12 · Personal y espacios</span>
+            <h2>Asignar docente y aula</h2>
+          </div>
+          {resourceMsg && <Notice kind={resourceMsg.kind}>{resourceMsg.text}</Notice>}
+          <label className="field">
+            <span>Curso y horario<em>*</em></span>
+            <select value={selectedId} onChange={(e) => { setSelectedId(e.target.value); setTeacher(""); setRoom(""); setResourceMsg(null); }}>
+              {schedules.map((s) => (
+                <option key={s.id} value={s.id}>{s.course} · {s.date} ({s.start} – {s.end})</option>
+              ))}
+            </select>
+          </label>
+          <div className="form-grid">
+            <label className="field">
+              <span>Docente disponible<em>*</em></span>
+              <select value={teacher} onChange={(e) => setTeacher(e.target.value)}>
+                <option value="">Seleccionar docente</option>
+                {availableTeachers.map((t) => <option key={t}>{t}</option>)}
+              </select>
+            </label>
+            <label className="field">
+              <span>Espacio / aula disponible<em>*</em></span>
+              <select value={room} onChange={(e) => setRoom(e.target.value)}>
+                <option value="">Seleccionar aula</option>
+                {availableRooms.map((r) => <option key={r}>{r}</option>)}
+              </select>
+            </label>
+          </div>
+          <Button onClick={assignResources} icon="check">Guardar asignación</Button>
+          <button
+            type="button"
+            className="prototype-link"
+            onClick={() => setResourceMsg({ kind: "error", text: "Este recurso no está disponible en el horario seleccionado." })}
+          >
+            Simular recurso ocupado en este horario
+          </button>
+        </section>
+      </div>
+
+      <section>
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">Programación vigente</span>
+            <h2>Horarios y recursos asignados</h2>
+          </div>
+          <Badge tone="blue">{schedules.length} horarios</Badge>
+        </div>
+        <div className="compact-list">
+          {schedules.map((item) => (
+            <article className="resource-row" key={item.id}>
+              <div>
+                <b>{item.course}</b>
+                <small>{item.language} · {item.level} · {item.date} ({item.start} – {item.end})</small>
+              </div>
+              <span><Icon name="user" size={17} /> {item.teacher || "Docente pendiente"}</span>
+              <span><Icon name="school" size={17} /> {item.room || "Aula pendiente"}</span>
+              <Badge tone={item.teacher && item.room ? "green" : "amber"}>
+                {item.teacher && item.room ? "Asignado" : "Pendiente"}
+              </Badge>
+            </article>
+          ))}
+        </div>
+      </section>
+    </Page>
+  );
 }
 
 function History({ navigate, role, clientId, user }: { navigate: (s: Screen) => void; role: Role; clientId?: number; user?: ApiUser | null }) {
@@ -473,7 +694,56 @@ export default function App() {
   const [cancelledCourses, setCancelledCourses] = useState<typeof availableClass[]>([]);
   const [selectedCourse, setSelectedCourse] = useState(availableClass);
   const [lastCancelledCourse, setLastCancelledCourse] = useState(availableClass);
-  const navigate = (next: Screen) => { setScreen(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const navigate = (next: Screen) => {
+    if (next === "login") {
+      setUser(null);
+
+    }      
+    const publicScreens: Screen[] = [
+      "login",
+      "recover",
+      "recover-sent",
+      "reset-password",
+      "reset-expired",
+      "reset-success",
+      "account-type",
+      "student-register",
+      "staff-register",
+      "language",
+      "confirmation",
+    ];
+    const studentScreens: Screen[] = [
+      "student-dashboard",
+      "student-classes",
+      "history",
+      "search",
+      "booking-detail",
+      "booking-success",
+      "cancellation-success",
+      "no-seats",
+      "foreign-reservation",
+    ];
+    const staffScreens: Screen[] = [
+      "staff-dashboard",
+      "staff-classes",
+      "staff-availability",
+      "history",
+    ];
+
+    if (!user && !publicScreens.includes(next)) {
+      setScreen("login");
+      return;
+    }
+    if (user && !publicScreens.includes(next) && next !== "access-denied") {
+      const allowed = role === "student" ? studentScreens : staffScreens;
+      if (!allowed.includes(next)) {
+        setScreen("access-denied");
+        return;
+      }
+    }
+    setScreen(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   async function confirmBooking() {
     if (!user || !selectedCourse.id) return;
     try {
@@ -508,6 +778,13 @@ export default function App() {
   const page = useMemo(() => {
     switch (screen) {
       case "login": return <Login navigate={navigate} setRole={setRole} setUser={setUser}/>;
+      case "recover": return <Recover navigate={navigate}/>;
+      case "recover-sent": return <RecoverSent navigate={navigate}/>;
+      case "reset-password": return <ResetPassword navigate={navigate}/>;
+      case "reset-expired": return <div className="center-page"><div className="success-card error-card"><Brand/><span className="error-icon"><Icon name="alert" size={42}/></span><span className="eyebrow error-label">Enlace no disponible</span><h1>Este enlace ya no es válido</h1><p>Este enlace ya no es válido. Solicita uno nuevo para recuperar tu contraseña.</p><Button onClick={() => navigate("recover")}>Solicitar un nuevo enlace</Button></div></div>;
+      case "reset-success": return <div className="center-page"><div className="success-card"><Brand/><span className="success-icon"><Icon name="check" size={42}/></span><span className="eyebrow">Contraseña actualizada</span><h1>Tu contraseña se actualizó correctamente.</h1><p>Ya puedes acceder a Agenda Fácil con tu nueva contraseña.</p><Button onClick={() => navigate("login")}>Ir al inicio de sesión</Button></div></div>;
+      case "access-denied": return <div className="center-page"><div className="success-card error-card"><Brand/><span className="error-icon"><Icon name="alert" size={42}/></span><span className="eyebrow error-label">Acceso denegado</span><h1>No tienes permisos para acceder a esta sección.</h1><p>Tu perfil actual no cuenta con autorización para ver esta funcionalidad.</p><Button onClick={() => navigate(role === "student" ? "student-dashboard" : "staff-dashboard")}>Volver a mi inicio</Button></div></div>;
+      case "foreign-reservation": return <div className="center-page"><div className="success-card error-card"><Brand/><span className="error-icon"><Icon name="alert" size={42}/></span><span className="eyebrow error-label">Reserva protegida</span><h1>No tienes autorización para acceder a esta reserva.</h1><p>La reserva pertenece a otro estudiante y no se mostró información privada.</p><Button onClick={() => navigate("student-classes")}>Volver a mis reservas</Button></div></div>;
       case "account-type": return <AccountType navigate={navigate}/>;
       case "student-register": return <Register role="student" navigate={navigate} setConfirmRole={setConfirmRole}/>;
       case "staff-register": return <Register role="staff" navigate={navigate} setConfirmRole={setConfirmRole}/>;
@@ -524,6 +801,7 @@ export default function App() {
       case "booking-success": return <BookingSuccess navigate={navigate} course={selectedCourse}/>;
       case "cancellation-success": return <CancellationSuccess navigate={navigate} course={lastCancelledCourse}/>;
       case "no-seats": return <NoSeats navigate={navigate}/>;
+      default: return <Login navigate={navigate} setRole={setRole} setUser={setUser}/>;
     }
   }, [screen, role, confirmRole, user, localBookings, newBooking, cancelledCourses, selectedCourse, lastCancelledCourse]);
   return page;

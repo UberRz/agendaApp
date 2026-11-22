@@ -490,3 +490,144 @@ svg { flex: 0 0 auto; }
   .modal-actions { grid-template-columns: 1fr; }
   .cancel-detail-grid { grid-template-columns: 1fr; }
 }
+
+/* === Estilos Sprint 3 (HU-02, HU-05, HU-09, HU-12, HU-26) === */
+:root {
+  --primary-dark: #254ea3;
+  --muted: #596377;
+  --amber: #9a5b0d;
+}
+
+.button.primary {
+  background: var(--primary-dark);
+}
+
+.auth-link {
+  padding: 0;
+  border: 0;
+  color: var(--primary-dark);
+  background: transparent;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.forgot-link {
+  justify-self: end;
+  margin-top: -7px;
+}
+
+.back-link {
+  display: block;
+  margin: 22px auto 0;
+}
+
+.state-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.success-card > .notice {
+  text-align: left;
+}
+
+.profile-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  padding: 5px;
+  margin-bottom: 22px;
+  border-radius: 13px;
+  background: #e9eef6;
+}
+
+.profile-switch button {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--muted);
+  background: transparent;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.profile-switch button.active {
+  color: var(--primary-dark);
+  background: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.management-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.85fr) minmax(480px, 1.35fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.management-form {
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.management-form > .button {
+  width: 100%;
+}
+
+.compact-list {
+  display: grid;
+  gap: 10px;
+}
+
+.compact-item,
+.resource-row {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: auto minmax(150px, 1fr) minmax(190px, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: white;
+}
+
+.resource-row {
+  grid-template-columns: minmax(170px, 1.3fr) 1fr 1fr auto;
+}
+
+.prototype-link {
+  width: fit-content;
+  margin: 18px auto 0;
+  display: block;
+  border: 0;
+  color: var(--primary-dark);
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.permission-card {
+  margin-top: 24px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid #c9d8f3;
+  border-radius: 15px;
+  background: var(--primary-soft);
+}
