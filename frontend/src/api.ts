@@ -165,3 +165,21 @@ export function reservationToCourse(reservation: ApiReservation) {
     total: reservation.cuposDisponibles,
   };
 }
+
+export function forgotPassword(email: string) {
+  return request<{ message: string }>("/auth/recuperar", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function validateResetToken(token: string) {
+  return request<{ valido: boolean }>(`/auth/restablecer/validar?token=${encodeURIComponent(token)}`);
+}
+
+export function resetPassword(token: string, password: string) {
+  return request<{ message: string }>("/auth/restablecer", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+}
