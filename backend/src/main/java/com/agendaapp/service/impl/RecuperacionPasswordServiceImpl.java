@@ -82,8 +82,8 @@ public class RecuperacionPasswordServiceImpl implements IRecuperacionPasswordSer
         try {
             emailService.enviarRecuperacion(usuario.getEmail(), usuario.getNombre(), enlace, minutosVigencia);
         } catch (RuntimeException e) {
-            log.warn("No se pudo enviar el correo de recuperación (usuarioId={}): {}",
-                    usuario.getId(), e.getClass().getSimpleName());
+            log.error("No se pudo enviar el correo de recuperación (usuarioId={}): {}",
+                    usuario.getId(), e.getMessage(), e);
         }
     }
 

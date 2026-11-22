@@ -31,11 +31,15 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/base_db
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
-      CORS_ALLOWED_ORIGINS: http://localhost:3000
-      SPRING_MAIL_HOST: mailpit
-      SPRING_MAIL_PORT: 1025
-      APP_MAIL_FROM: no-reply@agendafacil.local
-      APP_FRONTEND_URL: http://localhost:3000
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailpit}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-1025}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_MAIL_SMTP_AUTH: ${SPRING_MAIL_SMTP_AUTH:-false}
+      SPRING_MAIL_STARTTLS: ${SPRING_MAIL_STARTTLS:-false}
+      APP_MAIL_FROM: ${APP_MAIL_FROM:-no-reply@agendafacil.local}
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL:-http://localhost:3000}
       APP_EMAIL_MX_VALIDATION_ENABLED: "true"
     ports:
       - "8080:8080"
@@ -55,7 +59,7 @@ services:
       - base_network
 
   mailpit:
-    image: axllent/mailpit
+    image: docker.io/axllent/mailpit
     container_name: base_mailpit
     restart: always
     ports:
